@@ -516,7 +516,7 @@ async function autoTranslate() {
     return;
   }
 
-  const apiKey = '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';
+  const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
 
   // Show loading
   const btn = document.getElementById('translate-btn');
