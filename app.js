@@ -265,12 +265,13 @@ function showScreen(name) {
   // إذا خرجنا من المحادثة — أوقف كل شيء
   if (state.currentScreen === 'chat' && name !== 'chat') {
     window.speechSynthesis.cancel();
-    stopListening();
     stopWhisperRecording(true);
     stopWave();
     if (voiceMode) {
-      voiceMode  = false;
-      isSpeaking = false;
+      voiceMode   = false;
+      isSpeaking  = false;
+      isRecording = false;
+      unbindVoicePress();
       const vm = document.getElementById('chat-voice-mode');
       const cb = document.getElementById('chat-input-bar');
       if (vm) vm.style.display = 'none';
@@ -300,7 +301,7 @@ function switchTab(tab) {
   // أوقف الصوت إذا خرجنا من المحادثة
   if (state.activeTab === 'chat' && tab !== 'chat') {
     window.speechSynthesis.cancel();
-    stopListening();
+    stopWhisperRecording(true);
     stopWave();
   }
   state.activeTab = tab;
@@ -866,54 +867,77 @@ function speakChatText(text) {
   window.speechSynthesis.speak(utter);
 }
 
-// ===== VOICE INPUT (يعمل على جميع الأجهزة بما فيها iPhone) =====
-let recognition   = null;
+// ===== VOICE INPUT — Press & Hold → Whisper (جميع الأجهزة) =====
 let mediaRecorder = null;
 let audioChunks   = [];
 let voiceMode     = false;
 let isSpeaking    = false;
 let isRecording   = false;
-let silenceTimer  = null;
-
-// هل يدعم المتصفح SpeechRecognition؟ (Chrome/Edge) أم نستخدم Whisper؟
-const useWhisper = !(window.SpeechRecognition || window.webkitSpeechRecognition);
 
 function enterVoiceMode() {
   voiceMode = true;
   document.getElementById('chat-input-bar').style.display  = 'none';
   document.getElementById('chat-voice-mode').style.display = 'flex';
 
-  // انتظر حتى يُعرض الـ canvas ثم ابدأ
   setTimeout(() => {
     const canvas = document.getElementById('voice-canvas');
-    if (canvas) {
-      canvas.width = canvas.offsetWidth || canvas.parentElement?.offsetWidth || 320;
-    }
+    if (canvas) canvas.width = canvas.offsetWidth || canvas.parentElement?.offsetWidth || 320;
     stopWave();
-
-    if (useWhisper) {
-      setVoiceStatus('اضغط الموجة للتحدث', null);
-      document.getElementById('voice-wave-wrap').onclick = toggleWhisperRecording;
-      document.getElementById('voice-wave-wrap').style.cursor = 'pointer';
-    } else {
-      startListening();
-    }
-  }, 100);
+    setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
+    bindVoicePress();
+  }, 120);
 }
 
 function exitVoiceMode() {
-  voiceMode  = false;
-  isSpeaking = false;
+  voiceMode   = false;
+  isSpeaking  = false;
   isRecording = false;
-  clearTimeout(silenceTimer);
-  stopListening();
   stopWhisperRecording(true);
   window.speechSynthesis.cancel();
   stopWave();
+  unbindVoicePress();
   const vm = document.getElementById('chat-voice-mode');
   const cb = document.getElementById('chat-input-bar');
   if (vm) vm.style.display = 'none';
   if (cb) cb.style.display = 'flex';
+}
+
+// ربط أحداث الضغط على منطقة الموجة
+function bindVoicePress() {
+  const wrap = document.getElementById('voice-wave-wrap');
+  if (!wrap) return;
+  wrap.style.cursor = 'pointer';
+  wrap.style.userSelect = 'none';
+  wrap.style.webkitUserSelect = 'none';
+
+  wrap._onDown = (e) => { e.preventDefault(); voicePressStart(); };
+  wrap._onUp   = (e) => { e.preventDefault(); voicePressEnd();   };
+
+  wrap.addEventListener('mousedown',  wrap._onDown);
+  wrap.addEventListener('touchstart', wrap._onDown, { passive: false });
+  wrap.addEventListener('mouseup',    wrap._onUp);
+  wrap.addEventListener('touchend',   wrap._onUp,   { passive: false });
+  wrap.addEventListener('mouseleave', wrap._onUp);
+}
+
+function unbindVoicePress() {
+  const wrap = document.getElementById('voice-wave-wrap');
+  if (!wrap || !wrap._onDown) return;
+  wrap.removeEventListener('mousedown',  wrap._onDown);
+  wrap.removeEventListener('touchstart', wrap._onDown);
+  wrap.removeEventListener('mouseup',    wrap._onUp);
+  wrap.removeEventListener('touchend',   wrap._onUp);
+  wrap.removeEventListener('mouseleave', wrap._onUp);
+}
+
+function voicePressStart() {
+  if (!voiceMode || isSpeaking || isRecording) return;
+  startWhisperRecording();
+}
+
+function voicePressEnd() {
+  if (!voiceMode || !isRecording) return;
+  stopWhisperRecording(false);
 }
 
 // ===== WAVE CANVAS =====
@@ -985,80 +1009,7 @@ function setVoiceStatus(text, whoSpeaking) {
   }
 }
 
-// ===== Chrome/Edge: SpeechRecognition تلقائي =====
-function startListening() {
-  if (!voiceMode || isSpeaking || useWhisper) return;
-  stopListening();
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return;
-
-  recognition = new SR();
-  recognition.lang            = 'de-DE';
-  recognition.continuous      = false; // نعيد تشغيله يدوياً — أكثر استقراراً
-  recognition.interimResults  = true;
-  recognition.maxAlternatives = 1;
-
-  let collected = '';
-
-  recognition.onstart = () => {
-    collected = '';
-    if (!isSpeaking) setVoiceStatus('🎤 تحدث الآن...', 'user');
-  };
-
-  recognition.onresult = (event) => {
-    collected = '';
-    let interim = '';
-    for (let i = 0; i < event.results.length; i++) {
-      if (event.results[i].isFinal) collected += event.results[i][0].transcript + ' ';
-      else interim += event.results[i][0].transcript;
-    }
-    const display = (collected || interim).trim();
-    if (display) setVoiceStatus('💬 ' + display, 'user');
-    clearTimeout(silenceTimer);
-    if (collected.trim()) {
-      silenceTimer = setTimeout(() => {
-        const text = collected.trim();
-        if (text && voiceMode && !isSpeaking) {
-          stopListening();
-          sendChatVoice(text);
-        }
-      }, 1800);
-    }
-  };
-
-  recognition.onerror = (e) => {
-    if (e.error === 'aborted') return;
-    // أعد المحاولة في جميع الأخطاء
-    if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 400);
-  };
-
-  recognition.onend = () => {
-    // أهم شيء — إعادة البدء تلقائياً دائماً
-    if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 200);
-  };
-
-  try {
-    recognition.start();
-  } catch(e) {
-    setTimeout(() => voiceMode && !isSpeaking && startListening(), 400);
-  }
-}
-
-function stopListening() {
-  clearTimeout(silenceTimer);
-  if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
-}
-
-// ===== iPhone/Safari: Whisper عبر Groq =====
-async function toggleWhisperRecording() {
-  if (isSpeaking) return;
-  if (isRecording) {
-    stopWhisperRecording(false);
-  } else {
-    await startWhisperRecording();
-  }
-}
+// ===== Whisper عبر Groq — press & hold =====
 
 async function startWhisperRecording() {
   try {
@@ -1075,7 +1026,7 @@ async function startWhisperRecording() {
     };
     mediaRecorder.start();
     isRecording = true;
-    setVoiceStatus('🔴 جاري التسجيل... اضغط لإرسال', 'user');
+    setVoiceStatus('🔴 يسجل... ارفع إصبعك للإرسال', 'user');
   } catch(e) {
     showToast('❌ تعذّر الوصول للميكروفون');
   }
@@ -1113,10 +1064,12 @@ async function transcribeAndSend(blob, mimeType) {
     if (text) {
       sendChatVoice(text);
     } else {
-      setVoiceStatus('لم أسمعك، حاول مجدداً', null);
+      setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
+      showToast('لم أسمعك، حاول مجدداً');
     }
   } catch(e) {
-    setVoiceStatus('❌ خطأ في التحويل', null);
+    setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
+    showToast('❌ خطأ في التحويل، حاول مجدداً');
   }
 }
 
@@ -1157,13 +1110,16 @@ async function sendChatVoice(text) {
     utter.onend = () => {
       isSpeaking = false;
       if (voiceMode) {
-        setVoiceStatus('🎤 تحدث الآن...', 'user');
-        setTimeout(() => startListening(), 700);
+        stopWave();
+        setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
       }
     };
     utter.onerror = () => {
       isSpeaking = false;
-      if (voiceMode) setTimeout(() => startListening(), 700);
+      if (voiceMode) {
+        stopWave();
+        setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
+      }
     };
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utter);
@@ -1171,7 +1127,10 @@ async function sendChatVoice(text) {
   } catch(e) {
     isSpeaking = false;
     updateChatMessage(typingId, '❌ حدث خطأ');
-    if (voiceMode) setTimeout(() => startListening(), 2000);
+    if (voiceMode) {
+      stopWave();
+      setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
+    }
   }
 }
 
