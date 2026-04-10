@@ -704,36 +704,7 @@ async function startChat() {
   document.getElementById('chat-input-bar').style.display = 'flex';
   document.getElementById('chat-messages').innerHTML = '';
 
-  const info = getChatUserInfo();
-  const typingId = appendChatMessage('bot', '...', true);
-
-  try {
-    const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
-    const firstMessage = info.name
-      ? `Starte die Unterhaltung. Du kennst den Benutzer bereits. Sein Name ist ${info.name}. Begrüß ihn persönlich, frag wie es ihm geht und schlage ein Gesprächsthema vor.`
-      : `Starte die Unterhaltung. Du kennst den Benutzer noch nicht. Stell dich kurz vor und frag nach seinem Namen.`;
-
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        max_tokens: 200,
-        temperature: 0.85,
-        messages: [
-          { role: 'system', content: buildSystemPrompt() },
-          { role: 'user', content: firstMessage }
-        ]
-      })
-    });
-    const data = await res.json();
-    let reply = data.choices?.[0]?.message?.content || 'Hey! Ich bin Max 👋';
-    reply = processAndSaveInfo(reply);
-    chatHistory.push({ role: 'assistant', content: reply });
-    updateChatMessage(typingId, reply);
-  } catch(e) {
-    updateChatMessage(typingId, 'Hey! Ich bin Max 👋\n(مرحباً! أنا ماكس، كيف حالك؟)');
-  }
+  // المحادثة تبدأ بشكل طبيعي — المستخدم يبدأ أول
 }
 
 function resetChat() {
