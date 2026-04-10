@@ -759,13 +759,78 @@ function formatChatText(text) {
 
 function speakChatText(text) {
   if (!window.speechSynthesis) return;
-  // اقرأ فقط النص الألماني (بدون الأقواس العربية)
   const germanText = text.replace(/\(.*?\)/g, '').replace(/💡.*$/gm, '').trim();
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(germanText);
   utter.lang = 'de-DE';
   utter.rate = 0.85;
   window.speechSynthesis.speak(utter);
+}
+
+// ===== VOICE INPUT =====
+let recognition = null;
+let isListening = false;
+
+function toggleVoice() {
+  if (isListening) {
+    stopVoice();
+  } else {
+    startVoice();
+  }
+}
+
+function startVoice() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast('❌ المتصفح لا يدعم التعرف على الصوت — استخدم Chrome');
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = 'de-DE';   // الألمانية
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  const btn = document.getElementById('chat-mic-btn');
+  const input = document.getElementById('chat-input');
+
+  recognition.onstart = () => {
+    isListening = true;
+    btn.classList.add('mic-active');
+    btn.textContent = '🔴';
+    input.placeholder = '🎤 جاري الاستماع...';
+  };
+
+  recognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = 0; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    input.value = transcript;
+    // إذا انتهى الكلام، أرسل تلقائياً
+    if (event.results[event.results.length - 1].isFinal) {
+      stopVoice();
+      setTimeout(() => sendChat(), 300);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    stopVoice();
+    if (e.error !== 'no-speech') showToast('❌ تعذّر التعرف على الصوت');
+  };
+
+  recognition.onend = () => stopVoice();
+
+  recognition.start();
+}
+
+function stopVoice() {
+  isListening = false;
+  if (recognition) { try { recognition.stop(); } catch(e) {} }
+  const btn = document.getElementById('chat-mic-btn');
+  const input = document.getElementById('chat-input');
+  if (btn) { btn.classList.remove('mic-active'); btn.textContent = '🎤'; }
+  if (input) input.placeholder = 'اكتب أو تحدث بالألماني...';
 }
 
 // ===== TEXT TO SPEECH =====

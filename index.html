@@ -402,8 +402,9 @@
         <!-- messages injected here -->
       </div>
       <div class="chat-input-bar">
+        <button class="chat-mic-btn" id="chat-mic-btn" onclick="toggleVoice()" title="تحدث صوتياً">🎤</button>
         <input class="chat-input" id="chat-input" type="text"
-          placeholder="اكتب بالألماني أو العربي..."
+          placeholder="اكتب أو تحدث بالألماني..."
           onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendChat(); }">
         <button class="chat-send-btn" onclick="sendChat()" id="chat-send-btn">
           <span id="chat-send-icon">➤</span>
