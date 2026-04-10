@@ -867,7 +867,7 @@ function enterVoiceMode() {
 
   if (useWhisper) {
     // iPhone / Safari — اضغط للتحدث
-    setVoiceStatus('اضغط الكرة وتحدث', false);
+    setVoiceStatus('اضغط الكرة وتحدث', null);
     document.getElementById('voice-orb').onclick = toggleWhisperRecording;
   } else {
     // Chrome / Android — تلقائي
@@ -887,19 +887,14 @@ function exitVoiceMode() {
   document.getElementById('voice-orb').onclick = null;
 }
 
-function setVoiceStatus(text, listening) {
-  const orb    = document.getElementById('voice-orb');
-  const status = document.getElementById('voice-status');
-  const icon   = document.getElementById('voice-orb-icon');
-  if (!orb) return;
-  if (listening) {
-    orb.classList.add('orb-listening');
-    icon.textContent = '🔴';
-  } else {
-    orb.classList.remove('orb-listening');
-    icon.textContent = isSpeaking ? '🔊' : '🎤';
-  }
+function setVoiceStatus(text, whoSpeaking) {
+  // whoSpeaking: 'user' | 'max' | null
+  const status      = document.getElementById('voice-status');
+  const speakerUser = document.getElementById('speaker-user');
+  const speakerMax  = document.getElementById('speaker-max');
   if (status) status.textContent = text;
+  if (speakerUser) speakerUser.classList.toggle('active', whoSpeaking === 'user');
+  if (speakerMax)  speakerMax.classList.toggle('active',  whoSpeaking === 'max');
 }
 
 // ===== Chrome/Edge: SpeechRecognition تلقائي =====
@@ -913,7 +908,7 @@ function startListening() {
   recognition.interimResults = true;
   let collected = '';
 
-  recognition.onstart = () => { collected = ''; setVoiceStatus('🎤 تحدث الآن...', true); };
+  recognition.onstart = () => { collected = ''; setVoiceStatus('🎤 تحدث الآن...', 'user'); };
 
   recognition.onresult = (event) => {
     let interim = ''; collected = '';
@@ -922,7 +917,7 @@ function startListening() {
       else interim += event.results[i][0].transcript;
     }
     const display = (collected || interim).trim();
-    if (display) setVoiceStatus('💬 ' + display, true);
+    if (display) setVoiceStatus('💬 ' + display, 'user');
     clearTimeout(silenceTimer);
     if (collected.trim()) {
       silenceTimer = setTimeout(() => {
@@ -974,7 +969,7 @@ async function startWhisperRecording() {
     };
     mediaRecorder.start();
     isRecording = true;
-    setVoiceStatus('🔴 جاري التسجيل... اضغط لإرسال', true);
+    setVoiceStatus('🔴 جاري التسجيل... اضغط لإرسال', 'user');
   } catch(e) {
     showToast('❌ تعذّر الوصول للميكروفون');
   }
@@ -993,7 +988,7 @@ function stopWhisperRecording(cancel = false) {
 }
 
 async function transcribeAndSend(blob, mimeType) {
-  setVoiceStatus('⏳ جاري تحويل الصوت...', false);
+  setVoiceStatus('⏳ جاري تحويل الصوت...', null);
   try {
     const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
     const ext = mimeType.includes('mp4') ? 'audio.mp4' : 'audio.webm';
@@ -1012,17 +1007,17 @@ async function transcribeAndSend(blob, mimeType) {
     if (text) {
       sendChatVoice(text);
     } else {
-      setVoiceStatus('لم أسمعك، حاول مجدداً', false);
+      setVoiceStatus('لم أسمعك، حاول مجدداً', null);
     }
   } catch(e) {
-    setVoiceStatus('❌ خطأ في التحويل', false);
+    setVoiceStatus('❌ خطأ في التحويل', null);
   }
 }
 
 // إرسال عبر الصوت في الوضع المستمر
 async function sendChatVoice(text) {
   if (!text) return;
-  setVoiceStatus('⏳ ماكس يفكر...', false);
+  setVoiceStatus('⏳ ماكس يفكر...', null);
 
   appendChatMessage('user', text);
   chatHistory.push({ role: 'user', content: text });
@@ -1048,7 +1043,7 @@ async function sendChatVoice(text) {
 
     // اقرأ الرد بصوت ألماني ثم استمع تلقائياً
     isSpeaking = true;
-    setVoiceStatus('🔊 ماكس يتحدث...', false);
+    setVoiceStatus('🔊 ماكس يتحدث...', 'max');
     const germanText = reply.replace(/\(.*?\)/g, '').replace(/💡.*$/gm, '').trim();
     const utter = new SpeechSynthesisUtterance(germanText);
     utter.lang = 'de-DE';
@@ -1056,7 +1051,7 @@ async function sendChatVoice(text) {
     utter.onend = () => {
       isSpeaking = false;
       if (voiceMode) {
-        setVoiceStatus('🎤 تحدث الآن...', false);
+        setVoiceStatus('🎤 تحدث الآن...', 'user');
         setTimeout(() => startListening(), 700);
       }
     };
