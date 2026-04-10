@@ -887,14 +887,72 @@ function exitVoiceMode() {
   document.getElementById('voice-orb').onclick = null;
 }
 
+// ===== WAVE CANVAS =====
+let waveAnimFrame = null;
+let wavePhase     = 0;
+let waveActive    = false;
+let waveColor     = '#1A237E';
+
+function startWave(color) {
+  waveColor  = color;
+  waveActive = true;
+  const canvas = document.getElementById('voice-canvas');
+  if (!canvas) return;
+  canvas.width = canvas.parentElement?.offsetWidth || 320;
+  cancelAnimationFrame(waveAnimFrame);
+  drawWave(canvas);
+}
+
+function stopWave() {
+  waveActive = false;
+  cancelAnimationFrame(waveAnimFrame);
+  const canvas = document.getElementById('voice-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.moveTo(0, canvas.height / 2);
+  ctx.lineTo(canvas.width, canvas.height / 2);
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawWave(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.beginPath();
+  for (let x = 0; x <= W; x++) {
+    const y = H/2
+      + Math.sin((x / W) * Math.PI * 6 + wavePhase) * 28
+      + Math.sin((x / W) * Math.PI * 11 + wavePhase * 1.5) * 10
+      + Math.sin((x / W) * Math.PI * 3  + wavePhase * 0.7) * 16;
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = waveColor;
+  ctx.lineWidth   = 3;
+  ctx.lineJoin    = 'round';
+  ctx.stroke();
+  wavePhase += 0.1;
+  if (waveActive) waveAnimFrame = requestAnimationFrame(() => drawWave(canvas));
+}
+
 function setVoiceStatus(text, whoSpeaking) {
-  // whoSpeaking: 'user' | 'max' | null
-  const status      = document.getElementById('voice-status');
-  const speakerUser = document.getElementById('speaker-user');
-  const speakerMax  = document.getElementById('speaker-max');
+  const status = document.getElementById('voice-status');
+  const whoEl  = document.getElementById('voice-who');
   if (status) status.textContent = text;
-  if (speakerUser) speakerUser.classList.toggle('active', whoSpeaking === 'user');
-  if (speakerMax)  speakerMax.classList.toggle('active',  whoSpeaking === 'max');
+
+  if (whoSpeaking === 'user') {
+    if (whoEl) { whoEl.textContent = '🎤 أنت'; whoEl.classList.remove('max-speaking'); }
+    startWave('#1A237E');
+  } else if (whoSpeaking === 'max') {
+    if (whoEl) { whoEl.textContent = '🔊 Max'; whoEl.classList.add('max-speaking'); }
+    startWave('#FF6B35');
+  } else {
+    if (whoEl) { whoEl.textContent = '· · ·'; whoEl.classList.remove('max-speaking'); }
+    stopWave();
+  }
 }
 
 // ===== Chrome/Edge: SpeechRecognition تلقائي =====

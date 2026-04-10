@@ -626,76 +626,24 @@ body {
 .chat-send-btn:disabled { opacity: 0.5; }
 
 /* ===== موجات الصوت ===== */
-.voice-speakers {
+.voice-who {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 8px;
+  transition: color 0.4s;
+}
+.voice-who.max-speaking {
+  color: #FF6B35;
+}
+
+.voice-wave-container {
+  width: 100%;
+  max-width: 340px;
+  height: 100px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 24px;
-  width: 100%;
-}
-
-.voice-speaker {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.speaker-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
-.speaker-waves {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 60px;
-}
-
-.wbar {
-  width: 5px;
-  border-radius: 10px;
-  height: 8px;
-  transition: height 0.1s;
-}
-
-/* لون موجات المستخدم — أزرق */
-#waves-user .wbar {
-  background: var(--primary);
-  height: 8px;
-}
-#speaker-user.active .wbar:nth-child(1) { animation: wave 0.8s ease-in-out infinite 0.0s; }
-#speaker-user.active .wbar:nth-child(2) { animation: wave 0.8s ease-in-out infinite 0.1s; }
-#speaker-user.active .wbar:nth-child(3) { animation: wave 0.8s ease-in-out infinite 0.2s; }
-#speaker-user.active .wbar:nth-child(4) { animation: wave 0.8s ease-in-out infinite 0.3s; }
-#speaker-user.active .wbar:nth-child(5) { animation: wave 0.8s ease-in-out infinite 0.2s; }
-#speaker-user.active .wbar:nth-child(6) { animation: wave 0.8s ease-in-out infinite 0.1s; }
-#speaker-user.active .wbar:nth-child(7) { animation: wave 0.8s ease-in-out infinite 0.0s; }
-
-/* لون موجات ماكس — برتقالي */
-#waves-max .wbar {
-  background: #FF6B35;
-  height: 8px;
-}
-#speaker-max.active .wbar:nth-child(1) { animation: wave 0.7s ease-in-out infinite 0.0s; }
-#speaker-max.active .wbar:nth-child(2) { animation: wave 0.7s ease-in-out infinite 0.15s; }
-#speaker-max.active .wbar:nth-child(3) { animation: wave 0.7s ease-in-out infinite 0.3s; }
-#speaker-max.active .wbar:nth-child(4) { animation: wave 0.7s ease-in-out infinite 0.45s; }
-#speaker-max.active .wbar:nth-child(5) { animation: wave 0.7s ease-in-out infinite 0.3s; }
-#speaker-max.active .wbar:nth-child(6) { animation: wave 0.7s ease-in-out infinite 0.15s; }
-#speaker-max.active .wbar:nth-child(7) { animation: wave 0.7s ease-in-out infinite 0.0s; }
-
-@keyframes wave {
-  0%, 100% { height: 8px; }
-  50%       { height: 50px; }
-}
-
-.voice-divider {
-  font-size: 22px;
-  color: var(--text-secondary);
-  opacity: 0.4;
 }
 
 /* شاشة بدء المحادثة */
