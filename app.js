@@ -866,31 +866,48 @@ function speakChatText(text) {
   window.speechSynthesis.speak(utter);
 }
 
-// ===== VOICE INPUT =====
-let recognition  = null;
-let voiceMode    = false;
-let isSpeaking   = false;   // ماكس يتحدث الآن
-let silenceTimer = null;
+// ===== VOICE INPUT (يعمل على جميع الأجهزة بما فيها iPhone) =====
+let recognition   = null;
+let mediaRecorder = null;
+let audioChunks   = [];
+let voiceMode     = false;
+let isSpeaking    = false;
+let isRecording   = false;
+let silenceTimer  = null;
+
+// هل يدعم المتصفح SpeechRecognition؟ (Chrome/Edge) أم نستخدم Whisper؟
+const useWhisper = !(window.SpeechRecognition || window.webkitSpeechRecognition);
 
 function enterVoiceMode() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { showToast('❌ يعمل فقط في Chrome أو Edge'); return; }
+  if (!navigator.mediaDevices && useWhisper) {
+    showToast('❌ المتصفح لا يدعم الميكروفون');
+    return;
+  }
   voiceMode = true;
   document.getElementById('chat-input-bar').style.display  = 'none';
   document.getElementById('chat-voice-mode').style.display = 'flex';
-  startListening();
+
+  if (useWhisper) {
+    // iPhone / Safari — اضغط للتحدث
+    setVoiceStatus('اضغط الكرة وتحدث', false);
+    document.getElementById('voice-orb').onclick = toggleWhisperRecording;
+  } else {
+    // Chrome / Android — تلقائي
+    document.getElementById('voice-orb').onclick = null;
+    startListening();
+  }
 }
 
 function exitVoiceMode() {
   voiceMode  = false;
   isSpeaking = false;
   stopListening();
+  stopWhisperRecording(true);
   window.speechSynthesis.cancel();
   document.getElementById('chat-voice-mode').style.display = 'none';
   document.getElementById('chat-input-bar').style.display  = 'flex';
+  document.getElementById('voice-orb').onclick = null;
 }
-
-function toggleVoice() { /* الكرة لا تفعل شيئاً — المحادثة تلقائية */ }
 
 function setVoiceStatus(text, listening) {
   const orb    = document.getElementById('voice-orb');
@@ -899,67 +916,51 @@ function setVoiceStatus(text, listening) {
   if (!orb) return;
   if (listening) {
     orb.classList.add('orb-listening');
-    icon.textContent   = '🔴';
+    icon.textContent = '🔴';
   } else {
     orb.classList.remove('orb-listening');
-    icon.textContent   = isSpeaking ? '🔊' : '🎤';
+    icon.textContent = isSpeaking ? '🔊' : '🎤';
   }
   if (status) status.textContent = text;
 }
 
+// ===== Chrome/Edge: SpeechRecognition تلقائي =====
 function startListening() {
-  if (!voiceMode || isSpeaking) return;
+  if (!voiceMode || isSpeaking || useWhisper) return;
   stopListening();
-
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return;
-
   recognition = new SR();
-  recognition.lang            = 'de-DE';
-  recognition.continuous      = true;   // لا يتوقف أثناء الكلام
-  recognition.interimResults  = true;
-
+  recognition.lang           = 'de-DE';
+  recognition.continuous     = true;
+  recognition.interimResults = true;
   let collected = '';
 
-  recognition.onstart = () => {
-    collected = '';
-    setVoiceStatus('🎤 تحدث الآن...', true);
-  };
+  recognition.onstart = () => { collected = ''; setVoiceStatus('🎤 تحدث الآن...', true); };
 
   recognition.onresult = (event) => {
-    let interim = '';
-    collected   = '';
+    let interim = ''; collected = '';
     for (let i = 0; i < event.results.length; i++) {
       if (event.results[i].isFinal) collected += event.results[i][0].transcript + ' ';
       else interim += event.results[i][0].transcript;
     }
     const display = (collected || interim).trim();
     if (display) setVoiceStatus('💬 ' + display, true);
-
-    // بعد توقف 1.5 ثانية عن الكلام → أرسل
     clearTimeout(silenceTimer);
     if (collected.trim()) {
       silenceTimer = setTimeout(() => {
         const text = collected.trim();
-        if (text && voiceMode && !isSpeaking) {
-          stopListening();
-          sendChatVoice(text);
-        }
+        if (text && voiceMode && !isSpeaking) { stopListening(); sendChatVoice(text); }
       }, 1500);
     }
   };
 
   recognition.onerror = (e) => {
     if (e.error === 'no-speech' || e.error === 'aborted') return;
-    // أعد المحاولة تلقائياً
     setTimeout(() => voiceMode && !isSpeaking && startListening(), 1000);
   };
 
   recognition.onend = () => {
-    // أعد الاستماع تلقائياً إن لم يكن ماكس يتحدث
-    if (voiceMode && !isSpeaking) {
-      setTimeout(() => startListening(), 600);
-    }
+    if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 600);
   };
 
   try { recognition.start(); } catch(e) {}
@@ -968,6 +969,76 @@ function startListening() {
 function stopListening() {
   clearTimeout(silenceTimer);
   if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
+}
+
+// ===== iPhone/Safari: Whisper عبر Groq =====
+async function toggleWhisperRecording() {
+  if (isSpeaking) return;
+  if (isRecording) {
+    stopWhisperRecording(false);
+  } else {
+    await startWhisperRecording();
+  }
+}
+
+async function startWhisperRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+    mediaRecorder = new MediaRecorder(stream, { mimeType });
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      if (!voiceMode) return;
+      const blob = new Blob(audioChunks, { type: mimeType });
+      await transcribeAndSend(blob, mimeType);
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    setVoiceStatus('🔴 جاري التسجيل... اضغط لإرسال', true);
+  } catch(e) {
+    showToast('❌ تعذّر الوصول للميكروفون');
+  }
+}
+
+function stopWhisperRecording(cancel = false) {
+  isRecording = false;
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    if (cancel) {
+      mediaRecorder.stream?.getTracks().forEach(t => t.stop());
+      mediaRecorder.ondataavailable = null;
+      mediaRecorder.onstop = null;
+    }
+    try { mediaRecorder.stop(); } catch(e) {}
+  }
+}
+
+async function transcribeAndSend(blob, mimeType) {
+  setVoiceStatus('⏳ جاري تحويل الصوت...', false);
+  try {
+    const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
+    const ext = mimeType.includes('mp4') ? 'audio.mp4' : 'audio.webm';
+    const form = new FormData();
+    form.append('file', blob, ext);
+    form.append('model', 'whisper-large-v3-turbo');
+    form.append('language', 'de');
+
+    const res  = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      body: form
+    });
+    const data = await res.json();
+    const text = data.text?.trim();
+    if (text) {
+      sendChatVoice(text);
+    } else {
+      setVoiceStatus('لم أسمعك، حاول مجدداً', false);
+    }
+  } catch(e) {
+    setVoiceStatus('❌ خطأ في التحويل', false);
+  }
 }
 
 // إرسال عبر الصوت في الوضع المستمر
