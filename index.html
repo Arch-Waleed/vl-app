@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VL">
+  <meta name="theme-color" content="#1A237E">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.png">
+  <title>VL</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+
+  <!-- ===== AUTH SCREEN ===== -->
+  <div class="screen active" id="screen-auth">
+    <div class="auth-container">
+
+      <!-- Logo -->
+      <div class="auth-logo">
+        <div class="auth-logo-text">VL</div>
+        <div class="auth-logo-sub">Vokabeln Lernen 🇩🇪</div>
+      </div>
+
+      <!-- Login Form -->
+      <div class="auth-card" id="login-form">
+        <div class="auth-title">تسجيل الدخول</div>
+
+        <div class="form-group">
+          <label class="form-label">البريد الإلكتروني</label>
+          <input class="form-input" id="login-email" type="email" placeholder="example@email.com" dir="ltr">
+        </div>
+        <div class="form-group">
+          <label class="form-label">كلمة السر</label>
+          <input class="form-input" id="login-password" type="password" placeholder="••••••••" dir="ltr">
+        </div>
+
+        <div id="login-error" class="add-error" style="display:none"></div>
+
+        <button class="add-submit-btn" id="login-btn" onclick="loginUser()">
+          تسجيل الدخول
+        </button>
+
+        <div class="auth-switch">
+          ليس لديك حساب؟
+          <span onclick="showRegister()">سجّل الآن</span>
+        </div>
+      </div>
+
+      <!-- Register Form -->
+      <div class="auth-card" id="register-form" style="display:none">
+        <div class="auth-title">إنشاء حساب جديد</div>
+
+        <div class="form-group">
+          <label class="form-label">الاسم</label>
+          <input class="form-input" id="reg-name" type="text" placeholder="اسمك">
+        </div>
+        <div class="form-group">
+          <label class="form-label">البريد الإلكتروني</label>
+          <input class="form-input" id="reg-email" type="email" placeholder="example@email.com" dir="ltr">
+        </div>
+        <div class="form-group">
+          <label class="form-label">كلمة السر</label>
+          <input class="form-input" id="reg-password" type="password" placeholder="6 أحرف على الأقل" dir="ltr">
+        </div>
+
+        <div id="reg-error" class="add-error" style="display:none"></div>
+
+        <button class="add-submit-btn" id="reg-btn" onclick="registerUser()">
+          إنشاء الحساب
+        </button>
+
+        <div class="auth-switch">
+          لديك حساب؟
+          <span onclick="showLogin()">سجّل دخول</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== HOME SCREEN ===== -->
+  <div class="screen active" id="screen-home">
+    <div class="navbar">
+      <div style="width:36px"></div>
+      <div class="navbar-title" id="home-nav-title">VL</div>
+      <button class="navbar-btn" onclick="logoutUser()" title="خروج">🚪</button>
+    </div>
+
+    <div class="scroll-content">
+      <!-- Progress Card -->
+      <div class="progress-card">
+        <div class="vl-brand">
+          <span class="vl-logo">VL</span>
+          <span class="vl-tagline">Vokabeln Lernen — تعلم المصطلحات الألمانية</span>
+        </div>
+        <div class="progress-label">تقدمك في التعلم</div>
+        <div class="progress-count" id="progress-count">0 / 0 مصطلح</div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+        <div class="progress-percent" id="progress-percent">0% مكتمل</div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-grid">
+        <button class="action-btn" onclick="openFlashcards(getAllWords(), 'جميع المصطلحات')">
+          <span class="action-btn-icon">📚</span>
+          <span class="action-btn-label">بطاقات تعليمية</span>
+        </button>
+        <button class="action-btn" onclick="switchTab('quiz')">
+          <span class="action-btn-icon">🧠</span>
+          <span class="action-btn-label">اختبار قصير</span>
+        </button>
+      </div>
+
+      <!-- Categories -->
+      <div class="section-title">التصنيفات</div>
+      <div id="categories-list"></div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <div class="tab-item active" data-tab="home" onclick="switchTab('home')">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-label">الرئيسية</span>
+      </div>
+      <div class="tab-item" data-tab="quiz" onclick="switchTab('quiz')">
+        <span class="tab-icon">🧠</span>
+        <span class="tab-label">اختبار</span>
+      </div>
+      <div class="tab-item" data-tab="favorites" onclick="switchTab('favorites')">
+        <span class="tab-icon">❤️</span>
+        <span class="tab-label">المفضلة</span>
+      </div>
+      <div class="tab-item" data-tab="add" onclick="switchTab('add')">
+        <span class="tab-icon">➕</span>
+        <span class="tab-label">إضافة</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FLASHCARD SCREEN ===== -->
+  <div class="screen" id="screen-flashcard">
+    <div class="navbar">
+      <button class="navbar-btn" onclick="switchTab('home'); renderHome();">‹</button>
+      <div class="navbar-title" id="fc-title">بطاقات</div>
+      <button class="navbar-btn" id="fc-fav-btn" onclick="toggleFavFlashcard()">🤍</button>
+    </div>
+
+    <div class="flashcard-screen-body">
+      <!-- Progress -->
+      <div class="fc-progress-row">
+        <div class="fc-progress-bar">
+          <div class="fc-progress-fill" id="fc-progress-fill" style="width:0%"></div>
+        </div>
+        <div class="fc-progress-text" id="fc-progress-text">1 / 1</div>
+      </div>
+
+      <!-- Card -->
+      <div class="card-area" onclick="flipCard()">
+        <div class="card-inner" id="card-inner">
+          <!-- Front -->
+          <div class="card-face card-front">
+            <div class="card-tag">المصطلح الألماني</div>
+            <div class="card-word" id="fc-german">Hallo</div>
+            <div class="card-hint">اضغط لرؤية الترجمة 👆</div>
+          </div>
+          <!-- Back -->
+          <div class="card-face card-back">
+            <div class="card-tag">الترجمة العربية</div>
+            <div class="card-word" id="fc-arabic">مرحباً</div>
+            <div class="card-sentences">
+              <div class="card-sentence present">
+                <span class="sentence-label">🟢 مضارع</span>
+                <span class="sentence-text" id="fc-present"></span>
+              </div>
+              <div class="card-sentence past">
+                <span class="sentence-label">🔵 ماضي</span>
+                <span class="sentence-text" id="fc-past"></span>
+              </div>
+            </div>
+            <div class="card-hint">اضغط للعودة 👆</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="card-actions">
+        <button class="card-btn btn-prev" id="btn-prev" onclick="prevCard()">
+          › السابق
+        </button>
+        <button class="card-btn btn-learned" id="btn-learned" onclick="markLearned()">
+          ✓ تعلمته
+        </button>
+        <button class="card-btn btn-next" onclick="nextCard()">
+          التالي ‹
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== QUIZ SCREEN ===== -->
+  <div class="screen" id="screen-quiz">
+    <div class="navbar">
+      <button class="navbar-btn" onclick="switchTab('home'); renderHome();">‹</button>
+      <div class="navbar-title">اختبار المصطلحات</div>
+      <div class="score-badge" id="quiz-score">⭐ 0</div>
+    </div>
+
+    <div class="quiz-body">
+      <!-- Progress -->
+      <div class="fc-progress-row">
+        <div class="fc-progress-bar">
+          <div class="fc-progress-fill" id="quiz-progress-fill" style="width:0%"></div>
+        </div>
+        <div class="fc-progress-text" id="quiz-progress-text">1 / 15</div>
+      </div>
+
+      <!-- Question -->
+      <div class="quiz-question-card">
+        <div class="quiz-question-label">ما معنى هذه الكلمة؟</div>
+        <div class="quiz-word" id="quiz-word">Hallo</div>
+        <span class="quiz-category-badge" id="quiz-category">تحيات</span>
+      </div>
+
+      <!-- Options -->
+      <div class="quiz-options" id="quiz-options"></div>
+
+      <!-- Next Button -->
+      <button class="btn-next-quiz" id="btn-next-quiz" onclick="nextQuizQuestion()">
+        السؤال التالي ←
+      </button>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <div class="tab-item" data-tab="home" onclick="switchTab('home')">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-label">الرئيسية</span>
+      </div>
+      <div class="tab-item active" data-tab="quiz" onclick="switchTab('quiz')">
+        <span class="tab-icon">🧠</span>
+        <span class="tab-label">اختبار</span>
+      </div>
+      <div class="tab-item" data-tab="favorites" onclick="switchTab('favorites')">
+        <span class="tab-icon">❤️</span>
+        <span class="tab-label">المفضلة</span>
+      </div>
+      <div class="tab-item" data-tab="add" onclick="switchTab('add')">
+        <span class="tab-icon">➕</span>
+        <span class="tab-label">إضافة</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FAVORITES SCREEN ===== -->
+  <div class="screen" id="screen-favorites">
+    <div class="navbar">
+      <div style="width:36px"></div>
+      <div class="navbar-title">المفضلة ❤️</div>
+      <div style="width:36px"></div>
+    </div>
+
+    <div class="scroll-content">
+      <div id="favorites-list"></div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <div class="tab-item" data-tab="home" onclick="switchTab('home')">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-label">الرئيسية</span>
+      </div>
+      <div class="tab-item" data-tab="quiz" onclick="switchTab('quiz')">
+        <span class="tab-icon">🧠</span>
+        <span class="tab-label">اختبار</span>
+      </div>
+      <div class="tab-item active" data-tab="favorites" onclick="switchTab('favorites')">
+        <span class="tab-icon">❤️</span>
+        <span class="tab-label">المفضلة</span>
+      </div>
+      <div class="tab-item" data-tab="add" onclick="switchTab('add')">
+        <span class="tab-icon">➕</span>
+        <span class="tab-label">إضافة</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ADD WORD SCREEN ===== -->
+  <div class="screen" id="screen-add">
+    <div class="navbar">
+      <div style="width:36px"></div>
+      <div class="navbar-title">➕ إضافة كلمة</div>
+      <button class="navbar-btn" onclick="showApiKeyModal()" title="إعدادات AI">⚙️</button>
+    </div>
+
+    <div class="scroll-content">
+
+      <!-- AI Card -->
+      <div class="ai-card">
+        <div class="ai-card-header">
+          <span class="ai-icon">🤖</span>
+          <div>
+            <div class="ai-title">ترجمة ذكية تلقائية</div>
+            <div class="ai-subtitle">اكتب الكلمة واضغط ترجم — بالذكاء الاصطناعي 🤖</div>
+          </div>
+        </div>
+
+        <!-- German Input + Button -->
+        <div class="form-group">
+          <label class="form-label">الكلمة بالألمانية *</label>
+          <div class="input-with-btn">
+            <input class="form-input" id="input-german" type="text"
+              placeholder="مثال: das Buch" dir="ltr"
+              onkeydown="if(event.key==='Enter') autoTranslate()">
+            <button class="ai-translate-btn" id="translate-btn" onclick="autoTranslate()">
+              <span id="translate-btn-text">✨ ترجم</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- AI Result Fields (readonly, filled by AI) -->
+        <div id="ai-result-section" style="display:none">
+          <div class="form-group">
+            <label class="form-label">🇸🇦 الترجمة بالعربية</label>
+            <input class="form-input ai-filled" id="input-arabic" type="text" placeholder="—">
+          </div>
+          <div class="form-group">
+            <label class="form-label">🟢 جملة مضارع</label>
+            <input class="form-input ai-filled" id="input-present" type="text" placeholder="—" dir="ltr">
+          </div>
+          <div class="form-group">
+            <label class="form-label">🔵 جملة ماضي</label>
+            <input class="form-input ai-filled" id="input-past" type="text" placeholder="—" dir="ltr">
+          </div>
+          <div class="form-group">
+            <label class="form-label">التصنيف</label>
+            <input class="form-input" id="input-category" type="text" placeholder="كلماتي" list="categories-list-datalist">
+            <datalist id="categories-list-datalist">
+              <option value="كلماتي">
+              <option value="أساسيات">
+              <option value="تحيات">
+              <option value="الأسرة">
+              <option value="طعام">
+              <option value="ألوان">
+              <option value="عمل">
+              <option value="سفر">
+            </datalist>
+          </div>
+          <div id="add-error" class="add-error" style="display:none"></div>
+          <button class="add-submit-btn" onclick="submitAddWord()">💾 حفظ الكلمة</button>
+        </div>
+
+        <div id="ai-error" class="add-error" style="display:none"></div>
+      </div>
+
+      <!-- Custom Words List -->
+      <div class="section-title" style="margin-top:8px">كلماتي المضافة</div>
+      <div id="custom-words-list"></div>
+    </div>
+
+    <!-- API Key Modal -->
+    <div class="modal-overlay" id="apikey-modal" style="display:none">
+      <div class="modal-sheet">
+        <div class="modal-emoji">🔑</div>
+        <div class="modal-title">مفتاح Claude AI</div>
+        <div class="modal-message" style="margin-bottom:16px">
+          احصل على مفتاحك من<br>
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#1A237E;font-weight:700">console.anthropic.com</a>
+        </div>
+        <input class="form-input" id="apikey-input" type="password"
+          placeholder="sk-ant-..." dir="ltr" style="margin-bottom:16px;font-size:14px">
+        <div class="modal-btns">
+          <button class="modal-btn-primary" onclick="saveApiKey()">💾 حفظ المفتاح</button>
+          <button class="modal-btn-secondary" onclick="closeApiKeyModal()">إلغاء</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <div class="tab-item" data-tab="home" onclick="switchTab('home')">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-label">الرئيسية</span>
+      </div>
+      <div class="tab-item" data-tab="quiz" onclick="switchTab('quiz')">
+        <span class="tab-icon">🧠</span>
+        <span class="tab-label">اختبار</span>
+      </div>
+      <div class="tab-item" data-tab="favorites" onclick="switchTab('favorites')">
+        <span class="tab-icon">❤️</span>
+        <span class="tab-label">المفضلة</span>
+      </div>
+      <div class="tab-item active" data-tab="add" onclick="switchTab('add')">
+        <span class="tab-icon">➕</span>
+        <span class="tab-label">إضافة</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
