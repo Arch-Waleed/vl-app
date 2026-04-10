@@ -398,13 +398,22 @@
         <div class="navbar-title">💬 محادثة بالألمانية</div>
         <button class="navbar-btn" onclick="resetChat()" title="محادثة جديدة">🔄</button>
       </div>
-      <div class="chat-messages" id="chat-messages">
-        <!-- messages injected here -->
+
+      <div class="chat-messages" id="chat-messages"></div>
+
+      <!-- وضع المحادثة الصوتية المستمرة -->
+      <div class="chat-voice-mode" id="chat-voice-mode" style="display:none">
+        <div class="voice-orb" id="voice-orb" onclick="toggleVoice()">
+          <span id="voice-orb-icon">🎤</span>
+        </div>
+        <div class="voice-status" id="voice-status">اضغط للتحدث</div>
+        <button class="voice-exit-btn" onclick="exitVoiceMode()">⌨️ العودة للكتابة</button>
       </div>
-      <div class="chat-input-bar">
-        <button class="chat-mic-btn" id="chat-mic-btn" onclick="toggleVoice()" title="تحدث صوتياً">🎤</button>
+
+      <div class="chat-input-bar" id="chat-input-bar">
+        <button class="chat-mic-btn" id="chat-mic-btn" onclick="enterVoiceMode()" title="وضع المحادثة الصوتية">🎤</button>
         <input class="chat-input" id="chat-input" type="text"
-          placeholder="اكتب أو تحدث بالألماني..."
+          placeholder="اكتب بالألماني أو العربي..."
           onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendChat(); }">
         <button class="chat-send-btn" onclick="sendChat()" id="chat-send-btn">
           <span id="chat-send-icon">➤</span>

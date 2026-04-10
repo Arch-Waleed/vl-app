@@ -770,35 +770,61 @@ function speakChatText(text) {
 // ===== VOICE INPUT =====
 let recognition = null;
 let isListening = false;
+let voiceMode = false;   // وضع المحادثة الصوتية المستمرة
+
+function enterVoiceMode() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast('❌ يعمل فقط في Chrome أو Edge');
+    return;
+  }
+  voiceMode = true;
+  document.getElementById('chat-input-bar').style.display = 'none';
+  document.getElementById('chat-voice-mode').style.display = 'flex';
+  startVoice();
+}
+
+function exitVoiceMode() {
+  voiceMode = false;
+  stopVoice();
+  window.speechSynthesis.cancel();
+  document.getElementById('chat-voice-mode').style.display = 'none';
+  document.getElementById('chat-input-bar').style.display = 'flex';
+}
+
+function setVoiceStatus(text, listening) {
+  const orb = document.getElementById('voice-orb');
+  const status = document.getElementById('voice-status');
+  const icon = document.getElementById('voice-orb-icon');
+  if (!orb) return;
+  if (listening) {
+    orb.classList.add('orb-listening');
+    icon.textContent = '🔴';
+    status.textContent = text || 'جاري الاستماع...';
+  } else {
+    orb.classList.remove('orb-listening');
+    icon.textContent = '🎤';
+    status.textContent = text || 'اضغط للتحدث';
+  }
+}
 
 function toggleVoice() {
-  if (isListening) {
-    stopVoice();
-  } else {
-    startVoice();
-  }
+  if (isListening) stopVoice();
+  else startVoice();
 }
 
 function startVoice() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    showToast('❌ المتصفح لا يدعم التعرف على الصوت — استخدم Chrome');
-    return;
-  }
+  if (!SpeechRecognition) return;
 
   recognition = new SpeechRecognition();
-  recognition.lang = 'de-DE';   // الألمانية
+  recognition.lang = 'de-DE';
   recognition.continuous = false;
   recognition.interimResults = true;
 
-  const btn = document.getElementById('chat-mic-btn');
-  const input = document.getElementById('chat-input');
-
   recognition.onstart = () => {
     isListening = true;
-    btn.classList.add('mic-active');
-    btn.textContent = '🔴';
-    input.placeholder = '🎤 جاري الاستماع...';
+    if (voiceMode) setVoiceStatus('🎤 جاري الاستماع...', true);
   };
 
   recognition.onresult = (event) => {
@@ -806,31 +832,88 @@ function startVoice() {
     for (let i = 0; i < event.results.length; i++) {
       transcript += event.results[i][0].transcript;
     }
-    input.value = transcript;
-    // إذا انتهى الكلام، أرسل تلقائياً
-    if (event.results[event.results.length - 1].isFinal) {
+    if (voiceMode) {
+      document.getElementById('voice-status').textContent = '💬 ' + transcript;
+    } else {
+      document.getElementById('chat-input').value = transcript;
+    }
+    if (event.results[event.results.length - 1].isFinal && transcript.trim()) {
       stopVoice();
-      setTimeout(() => sendChat(), 300);
+      if (voiceMode) {
+        sendChatVoice(transcript.trim());
+      } else {
+        setTimeout(() => sendChat(), 300);
+      }
     }
   };
 
   recognition.onerror = (e) => {
     stopVoice();
-    if (e.error !== 'no-speech') showToast('❌ تعذّر التعرف على الصوت');
+    if (voiceMode && e.error !== 'no-speech') {
+      setVoiceStatus('❌ لم أسمعك، حاول مجدداً', false);
+      setTimeout(() => voiceMode && startVoice(), 2000);
+    }
   };
 
-  recognition.onend = () => stopVoice();
+  recognition.onend = () => {
+    isListening = false;
+    if (voiceMode) setVoiceStatus('اضغط للتحدث', false);
+  };
 
-  recognition.start();
+  try { recognition.start(); } catch(e) {}
 }
 
 function stopVoice() {
   isListening = false;
   if (recognition) { try { recognition.stop(); } catch(e) {} }
-  const btn = document.getElementById('chat-mic-btn');
-  const input = document.getElementById('chat-input');
-  if (btn) { btn.classList.remove('mic-active'); btn.textContent = '🎤'; }
-  if (input) input.placeholder = 'اكتب أو تحدث بالألماني...';
+}
+
+// إرسال عبر الصوت في الوضع المستمر
+async function sendChatVoice(text) {
+  if (!text) return;
+  setVoiceStatus('⏳ ماكس يفكر...', false);
+
+  appendChatMessage('user', text);
+  chatHistory.push({ role: 'user', content: text });
+  const typingId = appendChatMessage('bot', '...', true);
+
+  try {
+    const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 250,
+        temperature: 0.7,
+        messages: [{ role: 'system', content: CHAT_SYSTEM }, ...chatHistory.slice(-10)]
+      })
+    });
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || 'Entschuldigung!';
+    chatHistory.push({ role: 'assistant', content: reply });
+    updateChatMessage(typingId, reply);
+
+    // اقرأ الرد بصوت ألماني ثم استمع تلقائياً
+    setVoiceStatus('🔊 ماكس يتحدث...', false);
+    const germanText = reply.replace(/\(.*?\)/g, '').replace(/💡.*$/gm, '').trim();
+    const utter = new SpeechSynthesisUtterance(germanText);
+    utter.lang = 'de-DE';
+    utter.rate = 0.85;
+    utter.onend = () => {
+      if (voiceMode) {
+        setVoiceStatus('اضغط للتحدث', false);
+        // ابدأ الاستماع تلقائياً بعد ثانية
+        setTimeout(() => voiceMode && startVoice(), 800);
+      }
+    };
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utter);
+
+  } catch(e) {
+    updateChatMessage(typingId, '❌ حدث خطأ');
+    if (voiceMode) setTimeout(() => voiceMode && startVoice(), 2000);
+  }
 }
 
 // ===== TEXT TO SPEECH =====

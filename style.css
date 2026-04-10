@@ -102,20 +102,22 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 2px;
+  min-width: 0;
 }
 
 .tab-icon {
-  font-size: 24px;
+  font-size: 20px;
   transition: transform 0.15s;
 }
 
 .tab-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .tab-item.active .tab-label {
@@ -612,6 +614,58 @@ body {
   transition: background 0.2s;
 }
 .chat-send-btn:disabled { opacity: 0.5; }
+
+/* وضع المحادثة الصوتية */
+.chat-voice-mode {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  gap: 16px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+.voice-orb {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(26,35,126,0.3);
+  transition: transform 0.2s;
+}
+.voice-orb:active { transform: scale(0.95); }
+.voice-orb.orb-listening {
+  animation: orb-pulse 1.2s infinite;
+  background: linear-gradient(135deg, #ef5350, #e53935);
+}
+@keyframes orb-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(239,83,80,0.5); }
+  50%      { box-shadow: 0 0 0 20px rgba(239,83,80,0); }
+}
+
+.voice-status {
+  font-size: 15px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: center;
+}
+
+.voice-exit-btn {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
 
 .chat-mic-btn {
   width: 44px;
