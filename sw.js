@@ -1,4 +1,4 @@
-const CACHE_NAME = 'german-app-v4';
+const CACHE_NAME = 'german-app-v5';
 const urlsToCache = [
   '/vl-app/',
   '/vl-app/index.html',

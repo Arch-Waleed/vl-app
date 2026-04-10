@@ -391,17 +391,18 @@
 
     <div class="chat-messages" id="chat-messages" style="display:none"></div>
 
-    <!-- وضع المحادثة الصوتية المستمرة -->
+    <!-- وضع المحادثة الصوتية -->
     <div class="chat-voice-mode" id="chat-voice-mode" style="display:none">
       <div class="voice-who" id="voice-who">· · ·</div>
-      <div class="voice-wave-wrap">
+      <div class="voice-wave-wrap" id="voice-wave-wrap">
         <canvas id="voice-canvas" height="90"></canvas>
       </div>
-      <div class="voice-status" id="voice-status">جاري الاستماع...</div>
+      <div class="voice-status" id="voice-status">اضغط مع الاستمرار للتحدث</div>
+      <div class="voice-hint">اضغط ← تحدث ← ارفع إصبعك للإرسال</div>
       <button class="voice-exit-btn" onclick="exitVoiceMode()">⌨️ العودة للكتابة</button>
     </div>
 
-    <div class="chat-input-bar" id="chat-input-bar">
+    <div class="chat-input-bar" id="chat-input-bar" style="display:none">
       <button class="chat-mic-btn" id="chat-mic-btn" onclick="enterVoiceMode()" title="وضع المحادثة الصوتية">🎤</button>
       <input class="chat-input" id="chat-input" type="text"
         placeholder="اكتب بالألماني أو العربي..."
