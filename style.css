@@ -627,23 +627,24 @@ body {
 
 /* ===== موجات الصوت ===== */
 .voice-who {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   color: var(--primary);
-  margin-bottom: 8px;
-  transition: color 0.4s;
+  margin-bottom: 4px;
+  transition: color 0.3s;
+  min-height: 28px;
 }
-.voice-who.max-speaking {
-  color: #FF6B35;
-}
+.voice-who.max-speaking { color: #FF6B35; }
 
-.voice-wave-container {
+.voice-wave-wrap {
+  width: calc(100% - 40px);
+  max-width: 360px;
+  height: 90px;
+}
+.voice-wave-wrap canvas {
   width: 100%;
-  max-width: 340px;
-  height: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 90px;
+  display: block;
 }
 
 /* شاشة بدء المحادثة */

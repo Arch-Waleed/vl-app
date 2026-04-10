@@ -857,23 +857,26 @@ let silenceTimer  = null;
 const useWhisper = !(window.SpeechRecognition || window.webkitSpeechRecognition);
 
 function enterVoiceMode() {
-  if (!navigator.mediaDevices && useWhisper) {
-    showToast('❌ المتصفح لا يدعم الميكروفون');
-    return;
-  }
   voiceMode = true;
   document.getElementById('chat-input-bar').style.display  = 'none';
   document.getElementById('chat-voice-mode').style.display = 'flex';
 
-  if (useWhisper) {
-    // iPhone / Safari — اضغط للتحدث
-    setVoiceStatus('اضغط الكرة وتحدث', null);
-    document.getElementById('voice-orb').onclick = toggleWhisperRecording;
-  } else {
-    // Chrome / Android — تلقائي
-    document.getElementById('voice-orb').onclick = null;
-    startListening();
-  }
+  // انتظر حتى يُعرض الـ canvas ثم ابدأ
+  setTimeout(() => {
+    const canvas = document.getElementById('voice-canvas');
+    if (canvas) {
+      canvas.width = canvas.offsetWidth || canvas.parentElement?.offsetWidth || 320;
+    }
+    stopWave();
+
+    if (useWhisper) {
+      setVoiceStatus('اضغط الموجة للتحدث', null);
+      document.getElementById('voice-wave-wrap').onclick = toggleWhisperRecording;
+      document.getElementById('voice-wave-wrap').style.cursor = 'pointer';
+    } else {
+      startListening();
+    }
+  }, 100);
 }
 
 function exitVoiceMode() {
@@ -898,7 +901,8 @@ function startWave(color) {
   waveActive = true;
   const canvas = document.getElementById('voice-canvas');
   if (!canvas) return;
-  canvas.width = canvas.parentElement?.offsetWidth || 320;
+  const w = canvas.offsetWidth || canvas.parentElement?.offsetWidth || 320;
+  if (canvas.width !== w) canvas.width = w;
   cancelAnimationFrame(waveAnimFrame);
   drawWave(canvas);
 }
