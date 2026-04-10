@@ -1062,9 +1062,9 @@ function drawWave(canvas) {
   ctx.beginPath();
   for (let x = 0; x <= W; x++) {
     const y = H/2
-      + Math.sin((x / W) * Math.PI * 6 + wavePhase) * 28
-      + Math.sin((x / W) * Math.PI * 11 + wavePhase * 1.5) * 10
-      + Math.sin((x / W) * Math.PI * 3  + wavePhase * 0.7) * 16;
+      + Math.sin((x / W) * Math.PI * 6 + wavePhase) * 14
+      + Math.sin((x / W) * Math.PI * 11 + wavePhase * 1.5) * 5
+      + Math.sin((x / W) * Math.PI * 3  + wavePhase * 0.7) * 8;
     x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   }
   ctx.strokeStyle = waveColor;
