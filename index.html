@@ -381,7 +381,15 @@
       <button class="navbar-btn" onclick="resetChat()" title="محادثة جديدة">🔄</button>
     </div>
 
-    <div class="chat-messages" id="chat-messages"></div>
+    <!-- شاشة البدء -->
+    <div class="chat-welcome" id="chat-welcome">
+      <div class="chat-welcome-avatar">🧑‍🦱</div>
+      <div class="chat-welcome-name">Max</div>
+      <div class="chat-welcome-desc">صديقك الألماني — تحدث معه عن أي شيء وتعلم الألمانية بشكل طبيعي</div>
+      <button class="chat-start-btn" onclick="startChat()">▶ ابدأ المحادثة</button>
+    </div>
+
+    <div class="chat-messages" id="chat-messages" style="display:none"></div>
 
     <!-- وضع المحادثة الصوتية المستمرة -->
     <div class="chat-voice-mode" id="chat-voice-mode" style="display:none">

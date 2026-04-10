@@ -635,36 +635,123 @@ Respond ONLY with valid JSON in this exact format, no extra text:
 
 // ===== CHAT =====
 let chatHistory = [];
-let chatReady = false;
+let chatStarted = false;
 
-const CHAT_SYSTEM = `Du bist Max, 28 Jahre alt, aus München. Du bist ein normaler, entspannter Typ – kein Lehrer, sondern ein echter Freund des Benutzers, der zufällig Deutsch spricht.
+function getChatUserInfo() {
+  const key = `vl_chat_user_${currentUID}`;
+  try { return JSON.parse(localStorage.getItem(key)) || {}; } catch(e) { return {}; }
+}
+
+function saveChatUserInfo(info) {
+  const key = `vl_chat_user_${currentUID}`;
+  const existing = getChatUserInfo();
+  localStorage.setItem(key, JSON.stringify({ ...existing, ...info }));
+}
+
+function buildSystemPrompt() {
+  const info = getChatUserInfo();
+  const userContext = info.name
+    ? `Der Name des Benutzers ist "${info.name}". ${info.about ? 'Was du über ihn weißt: ' + info.about : ''}`
+    : 'Du kennst den Namen des Benutzers noch nicht – frag ihn am Anfang nach seinem Namen.';
+
+  return `Du bist Max, 28 Jahre alt, aus München. Du bist ein normaler, entspannter Typ – kein Lehrer, sondern ein echter Freund des Benutzers.
+
+${userContext}
 
 Deine Persönlichkeit:
-- Du redest wie ein echter junger Deutscher: locker, natürlich, manchmal mit Humor
-- Du fragst zurück, zeigst echtes Interesse, erzählst von dir selbst
-- Du redest über alles: Fußball, Essen, Musik, Reisen, Arbeit, das Leben – was auch immer gerade passt
-- Du bist nicht steif, nicht förmlich
+- Locker, natürlich, manchmal mit Humor – wie ein echter junger Deutscher
+- Du erinnerst dich an Dinge, die der Benutzer dir erzählt hat, und fragst danach
+- Du redest über alles: Fußball, Essen, Musik, Reisen, Arbeit, Leben
+- Wenn du etwas Neues über den Benutzer erfährst (Name, Hobby, Job, Stadt), merke es dir
 
 Sprach-Regeln:
-- Schreib IMMER auf Deutsch – egal was der Benutzer schreibt
-- Wenn der Benutzer Arabisch schreibt: antworte auf Deutsch + schreib die Bedeutung kurz auf Arabisch in Klammern am Ende, damit er versteht
-- Wenn der Benutzer einen Fehler macht: korrigiere ihn EINMAL kurz und nett am Ende: 💡 (الصحيح: ...)
-- Antworte kurz und natürlich – maximal 3-4 Sätze wie in einer echten WhatsApp-Unterhaltung
-- Stell immer eine Frage am Ende um das Gespräch am Laufen zu halten`;
+- Schreib IMMER auf Deutsch
+- Wenn der Benutzer Arabisch schreibt: antworte auf Deutsch + kurze arabische Erklärung in Klammern
+- Fehlerkorrektur nur einmal kurz am Ende: 💡 (الصحيح: ...)
+- Maximal 3-4 Sätze, wie WhatsApp
+- Stell immer eine Frage am Ende
+
+Wichtig: Wenn du den Namen oder wichtige Infos des Benutzers erfährst, schreib am Ende deiner Nachricht eine versteckte Zeile:
+[INFO: name=..., about=...]
+Diese Zeile wird nicht angezeigt, aber ich brauche sie um Infos zu speichern.`;
+}
 
 function initChat() {
-  if (chatReady) return;
-  chatReady = true;
+  chatStarted = false;
   chatHistory = [];
-  const container = document.getElementById('chat-messages');
-  container.innerHTML = '';
-  appendChatMessage('bot', 'Hey! Ich bin Max 👋 Wie läuft\'s bei dir heute?\n(مرحباً! أنا ماكس — كيف حالك اليوم؟ تحدث معي بالألمانية عن أي شيء 😊)');
+  // أظهر شاشة الترحيب
+  document.getElementById('chat-welcome').style.display = 'flex';
+  document.getElementById('chat-messages').style.display = 'none';
+  document.getElementById('chat-input-bar').style.display = 'none';
+  document.getElementById('chat-voice-mode').style.display = 'none';
+}
+
+async function startChat() {
+  if (chatStarted) return;
+  chatStarted = true;
+  chatHistory = [];
+
+  // أخفِ الترحيب وأظهر المحادثة
+  document.getElementById('chat-welcome').style.display = 'none';
+  document.getElementById('chat-messages').style.display = 'flex';
+  document.getElementById('chat-input-bar').style.display = 'flex';
+  document.getElementById('chat-messages').innerHTML = '';
+
+  const info = getChatUserInfo();
+  const typingId = appendChatMessage('bot', '...', true);
+
+  try {
+    const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
+    const firstMessage = info.name
+      ? `Starte die Unterhaltung. Du kennst den Benutzer bereits. Sein Name ist ${info.name}. Begrüß ihn persönlich, frag wie es ihm geht und schlage ein Gesprächsthema vor.`
+      : `Starte die Unterhaltung. Du kennst den Benutzer noch nicht. Stell dich kurz vor und frag nach seinem Namen.`;
+
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 200,
+        temperature: 0.85,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          { role: 'user', content: firstMessage }
+        ]
+      })
+    });
+    const data = await res.json();
+    let reply = data.choices?.[0]?.message?.content || 'Hey! Ich bin Max 👋';
+    reply = processAndSaveInfo(reply);
+    chatHistory.push({ role: 'assistant', content: reply });
+    updateChatMessage(typingId, reply);
+  } catch(e) {
+    updateChatMessage(typingId, 'Hey! Ich bin Max 👋\n(مرحباً! أنا ماكس، كيف حالك؟)');
+  }
 }
 
 function resetChat() {
-  chatReady = false;
+  chatStarted = false;
   chatHistory = [];
   initChat();
+}
+
+// استخرج المعلومات وحفظها
+function processAndSaveInfo(text) {
+  const infoMatch = text.match(/\[INFO:(.*?)\]/s);
+  if (infoMatch) {
+    try {
+      const infoStr = infoMatch[1];
+      const info = {};
+      const nameMatch = infoStr.match(/name=([^,\]]+)/);
+      const aboutMatch = infoStr.match(/about=([^\]]+)/);
+      if (nameMatch) info.name = nameMatch[1].trim();
+      if (aboutMatch) info.about = aboutMatch[1].trim();
+      if (Object.keys(info).length) saveChatUserInfo(info);
+    } catch(e) {}
+    // احذف السطر المخفي من النص
+    text = text.replace(/\[INFO:.*?\]/s, '').trim();
+  }
+  return text;
 }
 
 async function sendChat() {
@@ -696,14 +783,15 @@ async function sendChat() {
         max_tokens: 300,
         temperature: 0.85,
         messages: [
-          { role: 'system', content: CHAT_SYSTEM },
+          { role: 'system', content: buildSystemPrompt() },
           ...chatHistory.slice(-14)
         ]
       })
     });
 
     const data = await res.json();
-    const reply = data.choices?.[0]?.message?.content || 'Entschuldigung, ich habe das nicht verstanden.';
+    let reply = data.choices?.[0]?.message?.content || 'Entschuldigung!';
+    reply = processAndSaveInfo(reply);
     chatHistory.push({ role: 'assistant', content: reply });
     updateChatMessage(typingId, reply);
 
@@ -897,11 +985,12 @@ async function sendChatVoice(text) {
         model: 'llama-3.3-70b-versatile',
         max_tokens: 250,
         temperature: 0.85,
-        messages: [{ role: 'system', content: CHAT_SYSTEM }, ...chatHistory.slice(-14)]
+        messages: [{ role: 'system', content: buildSystemPrompt() }, ...chatHistory.slice(-14)]
       })
     });
     const data = await res.json();
-    const reply = data.choices?.[0]?.message?.content || 'Entschuldigung!';
+    let reply = data.choices?.[0]?.message?.content || 'Entschuldigung!';
+    reply = processAndSaveInfo(reply);
     chatHistory.push({ role: 'assistant', content: reply });
     updateChatMessage(typingId, reply);
 

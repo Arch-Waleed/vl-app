@@ -623,6 +623,47 @@ body {
 }
 .chat-send-btn:disabled { opacity: 0.5; }
 
+/* شاشة بدء المحادثة */
+.chat-welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px 24px;
+  text-align: center;
+}
+.chat-welcome-avatar {
+  font-size: 72px;
+  line-height: 1;
+}
+.chat-welcome-name {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--primary);
+}
+.chat-welcome-desc {
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 280px;
+  line-height: 1.6;
+}
+.chat-start-btn {
+  margin-top: 10px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 28px;
+  padding: 16px 40px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(26,35,126,0.3);
+  transition: transform 0.15s;
+}
+.chat-start-btn:active { transform: scale(0.97); }
+
 /* وضع المحادثة الصوتية */
 .chat-voice-mode {
   display: none;
