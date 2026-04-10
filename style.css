@@ -583,14 +583,17 @@ body {
 .chat-speak-btn:hover { opacity: 1; }
 
 .chat-input-bar {
+  position: fixed;
+  bottom: 75px;
+  left: 0;
+  right: 0;
   padding: 10px 16px;
   background: var(--bg);
   border-top: 1px solid var(--border);
   display: flex;
   gap: 10px;
   align-items: center;
-  flex-shrink: 0;
-  margin-bottom: 70px;
+  z-index: 50;
 }
 
 .chat-input {
