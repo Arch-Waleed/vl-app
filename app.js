@@ -703,17 +703,27 @@ Sprach-Regeln:
 
 Wichtig: Wenn du den Namen oder wichtige Infos des Benutzers erfährst, schreib am Ende deiner Nachricht eine versteckte Zeile:
 [INFO: name=..., about=...]
-Diese Zeile wird nicht angezeigt, aber ich brauche sie um Infos zu speichern.`;
+Diese Zeile wird nicht angezeigt, aber ich brauche sie um Infos zu speichern.
+
+Wenn der Benutzer "__START__" schickt, begrüße ihn auf natürliche lockere Art wie ein Freund der sich meldet — maximal 2 Sätze + eine Frage. Kein "__START__" im Antworttext anzeigen.`;
 }
 
 function initChat() {
-  chatStarted = false;
-  chatHistory = [];
-  // أظهر شاشة الترحيب
-  document.getElementById('chat-welcome').style.display = 'flex';
-  document.getElementById('chat-messages').style.display = 'none';
-  document.getElementById('chat-input-bar').style.display = 'none';
-  document.getElementById('chat-voice-mode').style.display = 'none';
+  // إذا كانت المحادثة جارية → أعرضها كما هي بدون إعادة تعيين
+  if (chatStarted) {
+    document.getElementById('chat-welcome').style.display  = 'none';
+    document.getElementById('chat-messages').style.display = 'flex';
+    if (!voiceMode) {
+      document.getElementById('chat-input-bar').style.display  = 'flex';
+      document.getElementById('chat-voice-mode').style.display = 'none';
+    }
+    return;
+  }
+  // أول مرة أو بعد الإنهاء → أظهر شاشة البدء
+  document.getElementById('chat-welcome').style.display      = 'flex';
+  document.getElementById('chat-messages').style.display     = 'none';
+  document.getElementById('chat-input-bar').style.display    = 'none';
+  document.getElementById('chat-voice-mode').style.display   = 'none';
 }
 
 async function startChat() {
@@ -722,18 +732,54 @@ async function startChat() {
   chatHistory = [];
 
   // أخفِ الترحيب وأظهر المحادثة
-  document.getElementById('chat-welcome').style.display = 'none';
-  document.getElementById('chat-messages').style.display = 'flex';
-  document.getElementById('chat-input-bar').style.display = 'flex';
-  document.getElementById('chat-messages').innerHTML = '';
+  document.getElementById('chat-welcome').style.display      = 'none';
+  document.getElementById('chat-messages').style.display     = 'flex';
+  document.getElementById('chat-input-bar').style.display    = 'flex';
+  document.getElementById('chat-messages').innerHTML         = '';
+  const endBtn = document.getElementById('chat-end-btn');
+  if (endBtn) endBtn.style.display = 'inline-flex';
 
-  // المحادثة تبدأ بشكل طبيعي — المستخدم يبدأ أول
+  // ماكس يبدأ المحادثة أولاً بتحية
+  const typingId = appendChatMessage('bot', '...', true);
+  try {
+    const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 120,
+        temperature: 0.9,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          { role: 'user',   content: '__START__' }
+        ]
+      })
+    });
+    const data  = await res.json();
+    let reply   = data.choices?.[0]?.message?.content || 'Hey! Wie geht\'s?';
+    reply = processAndSaveInfo(reply);
+    chatHistory.push({ role: 'assistant', content: reply });
+    updateChatMessage(typingId, reply);
+  } catch(e) {
+    updateChatMessage(typingId, 'Hey! Schön, dass du da bist 😊 Wie geht\'s?');
+  }
 }
 
 function resetChat() {
+  if (!confirm('إنهاء المحادثة الحالية؟')) return;
+  // أوقف كل شيء
+  window.speechSynthesis.cancel();
+  if (voiceMode) exitVoiceMode();
   chatStarted = false;
   chatHistory = [];
-  initChat();
+  document.getElementById('chat-welcome').style.display      = 'flex';
+  document.getElementById('chat-messages').style.display     = 'none';
+  document.getElementById('chat-input-bar').style.display    = 'none';
+  document.getElementById('chat-voice-mode').style.display   = 'none';
+  document.getElementById('chat-messages').innerHTML         = '';
+  const endBtn = document.getElementById('chat-end-btn');
+  if (endBtn) endBtn.style.display = 'none';
 }
 
 // استخرج المعلومات وحفظها
