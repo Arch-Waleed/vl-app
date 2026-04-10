@@ -264,19 +264,9 @@ function loadState() {
 function showScreen(name) {
   // إذا خرجنا من المحادثة — أوقف كل شيء
   if (state.currentScreen === 'chat' && name !== 'chat') {
-    window.speechSynthesis.cancel();
-    stopWhisperRecording(true);
+    if (voiceMode) exitVoiceMode();
+    else window.speechSynthesis.cancel();
     stopWave();
-    if (voiceMode) {
-      voiceMode   = false;
-      isSpeaking  = false;
-      isRecording = false;
-      unbindVoicePress();
-      const vm = document.getElementById('chat-voice-mode');
-      const cb = document.getElementById('chat-input-bar');
-      if (vm) vm.style.display = 'none';
-      if (cb) cb.style.display = 'none';
-    }
   }
 
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -300,8 +290,8 @@ function showScreen(name) {
 function switchTab(tab) {
   // أوقف الصوت إذا خرجنا من المحادثة
   if (state.activeTab === 'chat' && tab !== 'chat') {
-    window.speechSynthesis.cancel();
-    stopWhisperRecording(true);
+    if (voiceMode) exitVoiceMode();
+    else window.speechSynthesis.cancel();
     stopWave();
   }
   state.activeTab = tab;
@@ -726,60 +716,44 @@ function initChat() {
   document.getElementById('chat-voice-mode').style.display   = 'none';
 }
 
-async function startChat() {
+function startChat() {
   if (chatStarted) return;
   chatStarted = true;
   chatHistory = [];
 
   // أخفِ الترحيب وأظهر المحادثة
-  document.getElementById('chat-welcome').style.display      = 'none';
-  document.getElementById('chat-messages').style.display     = 'flex';
-  document.getElementById('chat-input-bar').style.display    = 'flex';
-  document.getElementById('chat-messages').innerHTML         = '';
+  document.getElementById('chat-welcome').style.display   = 'none';
+  document.getElementById('chat-messages').style.display  = 'flex';
+  document.getElementById('chat-input-bar').style.display = 'flex';
+  document.getElementById('chat-messages').innerHTML      = '';
   const endBtn = document.getElementById('chat-end-btn');
   if (endBtn) endBtn.style.display = 'inline-flex';
-
-  // ماكس يبدأ المحادثة أولاً بتحية
-  const typingId = appendChatMessage('bot', '...', true);
-  try {
-    const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        max_tokens: 120,
-        temperature: 0.9,
-        messages: [
-          { role: 'system', content: buildSystemPrompt() },
-          { role: 'user',   content: '__START__' }
-        ]
-      })
-    });
-    const data  = await res.json();
-    let reply   = data.choices?.[0]?.message?.content || 'Hey! Wie geht\'s?';
-    reply = processAndSaveInfo(reply);
-    chatHistory.push({ role: 'assistant', content: reply });
-    updateChatMessage(typingId, reply);
-  } catch(e) {
-    updateChatMessage(typingId, 'Hey! Schön, dass du da bist 😊 Wie geht\'s?');
-  }
+  // المحادثة فارغة — المستخدم يبدأ
 }
 
+// زر إنهاء المحادثة → يفتح Modal داخل التطبيق
 function resetChat() {
-  if (!confirm('إنهاء المحادثة الحالية؟')) return;
-  // أوقف كل شيء
+  if (!chatStarted) return;
+  document.getElementById('end-chat-modal').style.display = 'flex';
+}
+
+function confirmEndChat() {
+  document.getElementById('end-chat-modal').style.display = 'none';
   window.speechSynthesis.cancel();
   if (voiceMode) exitVoiceMode();
   chatStarted = false;
   chatHistory = [];
-  document.getElementById('chat-welcome').style.display      = 'flex';
-  document.getElementById('chat-messages').style.display     = 'none';
-  document.getElementById('chat-input-bar').style.display    = 'none';
-  document.getElementById('chat-voice-mode').style.display   = 'none';
-  document.getElementById('chat-messages').innerHTML         = '';
+  document.getElementById('chat-welcome').style.display    = 'flex';
+  document.getElementById('chat-messages').style.display   = 'none';
+  document.getElementById('chat-input-bar').style.display  = 'none';
+  document.getElementById('chat-voice-mode').style.display = 'none';
+  document.getElementById('chat-messages').innerHTML       = '';
   const endBtn = document.getElementById('chat-end-btn');
   if (endBtn) endBtn.style.display = 'none';
+}
+
+function cancelEndChat() {
+  document.getElementById('end-chat-modal').style.display = 'none';
 }
 
 // استخرج المعلومات وحفظها
@@ -913,77 +887,140 @@ function speakChatText(text) {
   window.speechSynthesis.speak(utter);
 }
 
-// ===== VOICE INPUT — Press & Hold → Whisper (جميع الأجهزة) =====
+// ===== VOICE — محادثة مستمرة تلقائية (VAD + Whisper) =====
+let micStream    = null;
+let audioCtx     = null;
+let analyserNode = null;
+let vadFrame     = null;
 let mediaRecorder = null;
-let audioChunks   = [];
-let voiceMode     = false;
-let isSpeaking    = false;
-let isRecording   = false;
+let audioChunks  = [];
+let voiceMode    = false;
+let isSpeaking   = false;   // ماكس يتحدث الآن (TTS)
+let isRecording  = false;   // يُسجَّل صوت المستخدم
+let silenceTimer = null;
+let recordStart  = 0;
+let discardRec   = false;
 
-function enterVoiceMode() {
+const VOICE_THRESH = 18;   // حد اكتشاف الصوت (0-255)
+const SILENCE_WAIT = 1400; // ms صمت قبل الإرسال
+const MIN_REC_MS   = 350;  // حد أدنى لطول التسجيل
+
+async function enterVoiceMode() {
   voiceMode = true;
   document.getElementById('chat-input-bar').style.display  = 'none';
   document.getElementById('chat-voice-mode').style.display = 'flex';
 
-  setTimeout(() => {
-    const canvas = document.getElementById('voice-canvas');
-    if (canvas) canvas.width = canvas.offsetWidth || canvas.parentElement?.offsetWidth || 320;
-    stopWave();
-    setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
-    bindVoicePress();
-  }, 120);
+  await new Promise(r => setTimeout(r, 120));
+  const canvas = document.getElementById('voice-canvas');
+  if (canvas) canvas.width = canvas.offsetWidth || canvas.parentElement?.offsetWidth || 320;
+
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true }
+    });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 256;
+    audioCtx.createMediaStreamSource(micStream).connect(analyserNode);
+
+    setVoiceStatus('أنا أسمعك...', 'idle');
+    runVAD();
+  } catch(e) {
+    showToast('❌ لا يمكن فتح الميكروفون');
+    voiceMode = false;
+    const vm = document.getElementById('chat-voice-mode');
+    const cb = document.getElementById('chat-input-bar');
+    if (vm) vm.style.display = 'none';
+    if (cb) cb.style.display = 'flex';
+  }
 }
 
 function exitVoiceMode() {
-  voiceMode   = false;
-  isSpeaking  = false;
+  voiceMode  = false;
+  isSpeaking = false;
+  cancelAnimationFrame(vadFrame);
+  clearTimeout(silenceTimer);
+  silenceTimer = null;
+
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    discardRec = true;
+    try { mediaRecorder.stop(); } catch(e) {}
+  }
   isRecording = false;
-  stopWhisperRecording(true);
+
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (audioCtx)  { audioCtx.close().catch(() => {}); audioCtx = null; }
+
   window.speechSynthesis.cancel();
   stopWave();
-  unbindVoicePress();
+
   const vm = document.getElementById('chat-voice-mode');
   const cb = document.getElementById('chat-input-bar');
   if (vm) vm.style.display = 'none';
   if (cb) cb.style.display = 'flex';
 }
 
-// ربط أحداث الضغط على منطقة الموجة
-function bindVoicePress() {
-  const wrap = document.getElementById('voice-wave-wrap');
-  if (!wrap) return;
-  wrap.style.cursor = 'pointer';
-  wrap.style.userSelect = 'none';
-  wrap.style.webkitUserSelect = 'none';
+// حلقة اكتشاف الصوت (VAD)
+function runVAD() {
+  if (!voiceMode || !analyserNode) return;
+  const buf = new Uint8Array(analyserNode.frequencyBinCount);
 
-  wrap._onDown = (e) => { e.preventDefault(); voicePressStart(); };
-  wrap._onUp   = (e) => { e.preventDefault(); voicePressEnd();   };
+  function tick() {
+    if (!voiceMode) return;
+    analyserNode.getByteFrequencyData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i];
+    const level = sum / buf.length;
 
-  wrap.addEventListener('mousedown',  wrap._onDown);
-  wrap.addEventListener('touchstart', wrap._onDown, { passive: false });
-  wrap.addEventListener('mouseup',    wrap._onUp);
-  wrap.addEventListener('touchend',   wrap._onUp,   { passive: false });
-  wrap.addEventListener('mouseleave', wrap._onUp);
+    if (!isSpeaking) {
+      if (level >= VOICE_THRESH) {
+        // كُشف صوت المستخدم
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+        if (!isRecording) startCapture();
+      } else if (isRecording && !silenceTimer) {
+        // بدأ الصمت — انتظر SILENCE_WAIT قبل الإرسال
+        silenceTimer = setTimeout(commitCapture, SILENCE_WAIT);
+      }
+    }
+    vadFrame = requestAnimationFrame(tick);
+  }
+  tick();
 }
 
-function unbindVoicePress() {
-  const wrap = document.getElementById('voice-wave-wrap');
-  if (!wrap || !wrap._onDown) return;
-  wrap.removeEventListener('mousedown',  wrap._onDown);
-  wrap.removeEventListener('touchstart', wrap._onDown);
-  wrap.removeEventListener('mouseup',    wrap._onUp);
-  wrap.removeEventListener('touchend',   wrap._onUp);
-  wrap.removeEventListener('mouseleave', wrap._onUp);
+function startCapture() {
+  if (!micStream || isRecording) return;
+  const mime = ['audio/webm;codecs=opus','audio/webm','audio/mp4']
+    .find(t => MediaRecorder.isTypeSupported(t)) || 'audio/mp4';
+  try {
+    mediaRecorder = new MediaRecorder(micStream, { mimeType: mime });
+    audioChunks = [];
+    recordStart = Date.now();
+    discardRec  = false;
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      if (discardRec || !voiceMode || audioChunks.length === 0) {
+        if (voiceMode && !isSpeaking) setVoiceStatus('أنا أسمعك...', 'idle');
+        return;
+      }
+      const blob = new Blob(audioChunks, { type: mime });
+      await transcribeAndSend(blob, mime);
+    };
+    mediaRecorder.start(100);
+    isRecording = true;
+    setVoiceStatus('🎤 يسمعك...', 'user');
+  } catch(e) { isRecording = false; }
 }
 
-function voicePressStart() {
-  if (!voiceMode || isSpeaking || isRecording) return;
-  startWhisperRecording();
-}
-
-function voicePressEnd() {
-  if (!voiceMode || !isRecording) return;
-  stopWhisperRecording(false);
+function commitCapture() {
+  silenceTimer = null;
+  if (!isRecording) return;
+  isRecording = false;
+  if (Date.now() - recordStart < MIN_REC_MS) discardRec = true;
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    try { mediaRecorder.stop(); } catch(e) {}
+  }
 }
 
 // ===== WAVE CANVAS =====
@@ -1049,49 +1086,20 @@ function setVoiceStatus(text, whoSpeaking) {
   } else if (whoSpeaking === 'max') {
     if (whoEl) { whoEl.textContent = '🔊 Max'; whoEl.classList.add('max-speaking'); }
     startWave('#FF6B35');
+  } else if (whoSpeaking === 'idle') {
+    // ينتظر — موجة هادئة زرقاء فاتحة
+    if (whoEl) { whoEl.textContent = '👂'; whoEl.classList.remove('max-speaking'); }
+    startWave('#90CAF9');
   } else {
-    if (whoEl) { whoEl.textContent = '· · ·'; whoEl.classList.remove('max-speaking'); }
+    if (whoEl) { whoEl.textContent = '⏳'; whoEl.classList.remove('max-speaking'); }
     stopWave();
   }
 }
 
-// ===== Whisper عبر Groq — press & hold =====
-
-async function startWhisperRecording() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-    mediaRecorder = new MediaRecorder(stream, { mimeType });
-    audioChunks = [];
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-    mediaRecorder.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop());
-      if (!voiceMode) return;
-      const blob = new Blob(audioChunks, { type: mimeType });
-      await transcribeAndSend(blob, mimeType);
-    };
-    mediaRecorder.start();
-    isRecording = true;
-    setVoiceStatus('🔴 يسجل... ارفع إصبعك للإرسال', 'user');
-  } catch(e) {
-    showToast('❌ تعذّر الوصول للميكروفون');
-  }
-}
-
-function stopWhisperRecording(cancel = false) {
-  isRecording = false;
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    if (cancel) {
-      mediaRecorder.stream?.getTracks().forEach(t => t.stop());
-      mediaRecorder.ondataavailable = null;
-      mediaRecorder.onstop = null;
-    }
-    try { mediaRecorder.stop(); } catch(e) {}
-  }
-}
+// ===== Whisper Transcription =====
 
 async function transcribeAndSend(blob, mimeType) {
-  setVoiceStatus('⏳ جاري تحويل الصوت...', null);
+  setVoiceStatus('⏳ يعالج...', null);
   try {
     const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
     const ext = mimeType.includes('mp4') ? 'audio.mp4' : 'audio.webm';
@@ -1110,12 +1118,10 @@ async function transcribeAndSend(blob, mimeType) {
     if (text) {
       sendChatVoice(text);
     } else {
-      setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
-      showToast('لم أسمعك، حاول مجدداً');
+      if (voiceMode && !isSpeaking) setVoiceStatus('أنا أسمعك...', 'idle');
     }
   } catch(e) {
-    setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
-    showToast('❌ خطأ في التحويل، حاول مجدداً');
+    if (voiceMode && !isSpeaking) setVoiceStatus('أنا أسمعك...', 'idle');
   }
 }
 
@@ -1123,6 +1129,7 @@ async function transcribeAndSend(blob, mimeType) {
 async function sendChatVoice(text) {
   if (!text) return;
   setVoiceStatus('⏳ ماكس يفكر...', null);
+  isSpeaking = true; // منع VAD من التسجيل أثناء معالجة الرد
 
   appendChatMessage('user', text);
   chatHistory.push({ role: 'user', content: text });
@@ -1156,16 +1163,17 @@ async function sendChatVoice(text) {
     utter.onend = () => {
       isSpeaking = false;
       if (voiceMode) {
-        stopWave();
-        setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
+        // تأخير 600ms بعد انتهاء ماكس لتجنب التقاط صداه
+        setTimeout(() => {
+          if (voiceMode && !isSpeaking) setVoiceStatus('أنا أسمعك...', 'idle');
+        }, 600);
       }
     };
     utter.onerror = () => {
       isSpeaking = false;
-      if (voiceMode) {
-        stopWave();
-        setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
-      }
+      if (voiceMode) setTimeout(() => {
+        if (voiceMode && !isSpeaking) setVoiceStatus('أنا أسمعك...', 'idle');
+      }, 600);
     };
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utter);
@@ -1173,10 +1181,9 @@ async function sendChatVoice(text) {
   } catch(e) {
     isSpeaking = false;
     updateChatMessage(typingId, '❌ حدث خطأ');
-    if (voiceMode) {
-      stopWave();
-      setVoiceStatus('اضغط مع الاستمرار للتحدث', null);
-    }
+    if (voiceMode) setTimeout(() => {
+      if (voiceMode && !isSpeaking) setVoiceStatus('أنا أسمعك...', 'idle');
+    }, 300);
   }
 }
 

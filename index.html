@@ -393,12 +393,11 @@
 
     <!-- وضع المحادثة الصوتية -->
     <div class="chat-voice-mode" id="chat-voice-mode" style="display:none">
-      <div class="voice-who" id="voice-who">· · ·</div>
+      <div class="voice-who" id="voice-who">👂</div>
       <div class="voice-wave-wrap" id="voice-wave-wrap">
         <canvas id="voice-canvas" height="90"></canvas>
       </div>
-      <div class="voice-status" id="voice-status">اضغط مع الاستمرار للتحدث</div>
-      <div class="voice-hint">اضغط ← تحدث ← ارفع إصبعك للإرسال</div>
+      <div class="voice-status" id="voice-status">أنا أسمعك...</div>
       <button class="voice-exit-btn" onclick="exitVoiceMode()">⌨️ العودة للكتابة</button>
     </div>
 
@@ -434,6 +433,19 @@
     <div class="tab-item" data-tab="add" onclick="switchTab('add')">
       <span class="tab-icon">➕</span>
       <span class="tab-label">إضافة</span>
+    </div>
+  </div>
+
+  <!-- نافذة تأكيد إنهاء المحادثة -->
+  <div class="end-chat-modal" id="end-chat-modal" style="display:none">
+    <div class="end-chat-box">
+      <div class="end-chat-icon">💬</div>
+      <div class="end-chat-title">إنهاء المحادثة؟</div>
+      <div class="end-chat-sub">ستُحذف الرسائل الحالية</div>
+      <div class="end-chat-btns">
+        <button class="end-chat-confirm" onclick="confirmEndChat()">نعم، إنهاء</button>
+        <button class="end-chat-cancel"  onclick="cancelEndChat()">إلغاء</button>
+      </div>
     </div>
   </div>
 
