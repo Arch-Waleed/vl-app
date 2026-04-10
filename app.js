@@ -516,11 +516,7 @@ async function autoTranslate() {
     return;
   }
 
-  const apiKey = localStorage.getItem('groqApiKey');
-  if (!apiKey) {
-    showApiKeyModal();
-    return;
-  }
+  const apiKey = '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';
 
   // Show loading
   const btn = document.getElementById('translate-btn');
