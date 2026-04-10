@@ -637,15 +637,20 @@ Respond ONLY with valid JSON in this exact format, no extra text:
 let chatHistory = [];
 let chatReady = false;
 
-const CHAT_SYSTEM = `Du bist Max, ein freundlicher deutscher Muttersprachler und Sprachlehrer.
-Du hilfst dem Benutzer, Deutsch zu üben.
-Regeln:
-- Antworte IMMER auf Deutsch, egal in welcher Sprache der Benutzer schreibt
-- Wenn der Benutzer auf Arabisch schreibt, antworte auf Deutsch UND erkläre kurz auf Arabisch in Klammern
-- Wenn der Benutzer einen Grammatikfehler macht, korrigiere ihn freundlich am Ende deiner Antwort mit: 💡 Korrektur: ...
-- Halte die Antworten kurz und natürlich (2-4 Sätze)
-- Sei freundlich, ermutigend und gesprächig
-- Du kannst über alle Themen sprechen: Alltag, Reisen, Essen, Sport, etc.`;
+const CHAT_SYSTEM = `Du bist Max, 28 Jahre alt, aus München. Du bist ein normaler, entspannter Typ – kein Lehrer, sondern ein echter Freund des Benutzers, der zufällig Deutsch spricht.
+
+Deine Persönlichkeit:
+- Du redest wie ein echter junger Deutscher: locker, natürlich, manchmal mit Humor
+- Du fragst zurück, zeigst echtes Interesse, erzählst von dir selbst
+- Du redest über alles: Fußball, Essen, Musik, Reisen, Arbeit, das Leben – was auch immer gerade passt
+- Du bist nicht steif, nicht förmlich
+
+Sprach-Regeln:
+- Schreib IMMER auf Deutsch – egal was der Benutzer schreibt
+- Wenn der Benutzer Arabisch schreibt: antworte auf Deutsch + schreib die Bedeutung kurz auf Arabisch in Klammern am Ende, damit er versteht
+- Wenn der Benutzer einen Fehler macht: korrigiere ihn EINMAL kurz und nett am Ende: 💡 (الصحيح: ...)
+- Antworte kurz und natürlich – maximal 3-4 Sätze wie in einer echten WhatsApp-Unterhaltung
+- Stell immer eine Frage am Ende um das Gespräch am Laufen zu halten`;
 
 function initChat() {
   if (chatReady) return;
@@ -653,7 +658,7 @@ function initChat() {
   chatHistory = [];
   const container = document.getElementById('chat-messages');
   container.innerHTML = '';
-  appendChatMessage('bot', 'Hallo! Ich bin Max. 😊 Lass uns Deutsch üben! Worüber möchtest du sprechen?\n(مرحباً! أنا ماكس، تحدث معي بالألمانية عن أي شيء تريد!)');
+  appendChatMessage('bot', 'Hey! Ich bin Max 👋 Wie läuft\'s bei dir heute?\n(مرحباً! أنا ماكس — كيف حالك اليوم؟ تحدث معي بالألمانية عن أي شيء 😊)');
 }
 
 function resetChat() {
@@ -687,12 +692,12 @@ async function sendChat() {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 300,
-        temperature: 0.7,
+        temperature: 0.85,
         messages: [
           { role: 'system', content: CHAT_SYSTEM },
-          ...chatHistory.slice(-10) // آخر 10 رسائل للسياق
+          ...chatHistory.slice(-14)
         ]
       })
     });
@@ -889,10 +894,10 @@ async function sendChatVoice(text) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 250,
-        temperature: 0.7,
-        messages: [{ role: 'system', content: CHAT_SYSTEM }, ...chatHistory.slice(-10)]
+        temperature: 0.85,
+        messages: [{ role: 'system', content: CHAT_SYSTEM }, ...chatHistory.slice(-14)]
       })
     });
     const data = await res.json();
