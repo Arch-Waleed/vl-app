@@ -349,10 +349,12 @@ function renderFlashcard() {
   document.getElementById('fc-progress-fill').style.width = pct + '%';
 
   // Card content
-  document.getElementById('fc-german').textContent = word.german;
-  document.getElementById('fc-arabic').textContent = word.arabic;
-  document.getElementById('fc-present').textContent = word.present || '';
-  document.getElementById('fc-past').textContent = word.past || '';
+  document.getElementById('fc-german').textContent  = word.german;
+  document.getElementById('fc-arabic').textContent  = word.arabic;
+  document.getElementById('fc-present').textContent = word.present    || '';
+  document.getElementById('fc-past').textContent    = word.past       || '';
+  document.getElementById('fc-present-ar').textContent = word.presentArabic || '';
+  document.getElementById('fc-past-ar').textContent    = word.pastArabic    || '';
 
   // Flip state
   const inner = document.getElementById('card-inner');
@@ -562,12 +564,14 @@ async function autoTranslate() {
 
   try {
     const prompt = `You are a German language teacher. For the German word/phrase "${german}", provide:
-1. The accurate Arabic translation
-2. One natural German example sentence in present tense that actually uses this word in context
-3. One natural German example sentence in past tense that actually uses this word in context
+1. The accurate Arabic translation of the word
+2. One natural German example sentence in present tense using this word
+3. Arabic translation of the present tense sentence
+4. One natural German example sentence in past tense using this word
+5. Arabic translation of the past tense sentence
 
 Respond ONLY with valid JSON in this exact format, no extra text:
-{"arabic":"...", "present":"...", "past":"..."}`;
+{"arabic":"...", "present":"...", "presentArabic":"...", "past":"...", "pastArabic":"..."}`;
 
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -599,10 +603,13 @@ Respond ONLY with valid JSON in this exact format, no extra text:
     if (!result.arabic) throw new Error('لم يتم الحصول على ترجمة');
 
     // Fill fields
-    document.getElementById('input-arabic').value  = result.arabic;
-    document.getElementById('input-present').value = result.present || '';
-    document.getElementById('input-past').value    = result.past || '';
+    document.getElementById('input-arabic').value  = result.arabic        || '';
+    document.getElementById('input-present').value = result.present       || '';
+    document.getElementById('input-past').value    = result.past          || '';
     document.getElementById('input-category').value = '';
+    // حفظ ترجمات الجمل مؤقتاً لإضافتها مع الكلمة
+    document.getElementById('input-present').dataset.arabic = result.presentArabic || '';
+    document.getElementById('input-past').dataset.arabic    = result.pastArabic    || '';
 
     // Show result
     const section = document.getElementById('ai-result-section');
@@ -617,6 +624,24 @@ Respond ONLY with valid JSON in this exact format, no extra text:
     btn.classList.remove('loading');
     btnText.textContent = '✨ ترجم';
   }
+}
+
+// ===== TEXT TO SPEECH =====
+function speakText(part) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+
+  const word = state.flashcard.words[state.flashcard.index];
+  let text = '';
+  if (part === 'word')    text = word.german;
+  if (part === 'present') text = word.present || '';
+  if (part === 'past')    text = word.past    || '';
+  if (!text) return;
+
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'de-DE';
+  utter.rate = 0.85;
+  window.speechSynthesis.speak(utter);
 }
 
 function showAiError(msg) {
@@ -683,11 +708,15 @@ function submitAddWord() {
   errorEl.style.display = 'none';
 
   // Add word
+  const presentEl = document.getElementById('input-present');
+  const pastEl    = document.getElementById('input-past');
   const newWord = {
     german,
     arabic,
-    present: present || `${german} ist wichtig.`,
-    past:    past    || `${german} war wichtig.`,
+    present:        present || `${german} ist wichtig.`,
+    presentArabic:  presentEl.dataset.arabic || '',
+    past:           past    || `${german} war wichtig.`,
+    pastArabic:     pastEl.dataset.arabic    || '',
     category,
     emoji: '✏️',
     isCustom: true

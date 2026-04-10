@@ -170,6 +170,7 @@
           <div class="card-face card-front">
             <div class="card-tag">المصطلح الألماني</div>
             <div class="card-word" id="fc-german">Hallo</div>
+            <button class="speak-btn" onclick="event.stopPropagation(); speakText('word')" title="استمع">🔊</button>
             <div class="card-hint">اضغط لرؤية الترجمة 👆</div>
           </div>
           <!-- Back -->
@@ -178,12 +179,20 @@
             <div class="card-word" id="fc-arabic">مرحباً</div>
             <div class="card-sentences">
               <div class="card-sentence present">
-                <span class="sentence-label">🟢 مضارع</span>
+                <div class="sentence-top">
+                  <span class="sentence-label">🟢 مضارع</span>
+                  <button class="speak-btn-sm" onclick="event.stopPropagation(); speakText('present')" title="استمع">🔊</button>
+                </div>
                 <span class="sentence-text" id="fc-present"></span>
+                <span class="sentence-arabic" id="fc-present-ar"></span>
               </div>
               <div class="card-sentence past">
-                <span class="sentence-label">🔵 ماضي</span>
+                <div class="sentence-top">
+                  <span class="sentence-label">🔵 ماضي</span>
+                  <button class="speak-btn-sm" onclick="event.stopPropagation(); speakText('past')" title="استمع">🔊</button>
+                </div>
                 <span class="sentence-text" id="fc-past"></span>
+                <span class="sentence-arabic" id="fc-past-ar"></span>
               </div>
             </div>
             <div class="card-hint">اضغط للعودة 👆</div>
