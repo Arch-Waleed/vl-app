@@ -556,6 +556,13 @@ body {
   color: var(--text);
   border-bottom-left-radius: 4px;
   border: 1px solid var(--border);
+  direction: ltr;
+  text-align: left;
+}
+
+.chat-msg-user .chat-bubble {
+  direction: ltr;
+  text-align: left;
 }
 
 .chat-correction {

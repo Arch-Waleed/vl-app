@@ -968,11 +968,17 @@ function startListening() {
   recognition.lang           = 'de-DE';
   recognition.continuous     = true;
   recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
   let collected = '';
+  let lastResultTime = Date.now();
 
-  recognition.onstart = () => { collected = ''; setVoiceStatus('🎤 تحدث الآن...', 'user'); };
+  recognition.onstart = () => {
+    collected = '';
+    setVoiceStatus('🎤 تحدث الآن...', 'user');
+  };
 
   recognition.onresult = (event) => {
+    lastResultTime = Date.now();
     let interim = ''; collected = '';
     for (let i = 0; i < event.results.length; i++) {
       if (event.results[i].isFinal) collected += event.results[i][0].transcript + ' ';
@@ -981,24 +987,32 @@ function startListening() {
     const display = (collected || interim).trim();
     if (display) setVoiceStatus('💬 ' + display, 'user');
     clearTimeout(silenceTimer);
+    // انتظر 2 ثانية صمت بعد آخر كلام
     if (collected.trim()) {
       silenceTimer = setTimeout(() => {
         const text = collected.trim();
         if (text && voiceMode && !isSpeaking) { stopListening(); sendChatVoice(text); }
-      }, 1500);
+      }, 2000);
     }
   };
 
   recognition.onerror = (e) => {
-    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    if (e.error === 'aborted') return;
+    if (e.error === 'no-speech') {
+      // أعد المحاولة تلقائياً
+      if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 300);
+      return;
+    }
     setTimeout(() => voiceMode && !isSpeaking && startListening(), 1000);
   };
 
   recognition.onend = () => {
-    if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 600);
+    if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 300);
   };
 
-  try { recognition.start(); } catch(e) {}
+  try { recognition.start(); } catch(e) {
+    setTimeout(() => voiceMode && !isSpeaking && startListening(), 500);
+  }
 }
 
 function stopListening() {
