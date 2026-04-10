@@ -6,7 +6,7 @@ const firebaseConfig = {
   storageBucket: "vl-app-135e4.firebasestorage.app",
   messagingSenderId: "689759592792",
   appId: "1:689759592792:web:c3289c27a6db63c627452d",
-  databaseURL: "https://vl-app-135e4-default-rtdb.firebaseio.com"
+  databaseURL: "https://vl-app-135e4-default-rtdb.europe-west1.firebasedatabase.app"
 };
 
 firebase.initializeApp(firebaseConfig);
