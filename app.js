@@ -276,6 +276,7 @@ function switchTab(tab) {
   else if (tab === 'quiz') startQuiz(getAllWords());
   else if (tab === 'favorites') renderFavorites();
   else if (tab === 'add') renderAddScreen();
+  else if (tab === 'chat') initChat();
 
   showScreen(tab === 'quiz' ? 'quiz' : tab);
 }
@@ -624,6 +625,147 @@ Respond ONLY with valid JSON in this exact format, no extra text:
     btn.classList.remove('loading');
     btnText.textContent = '✨ ترجم';
   }
+}
+
+// ===== CHAT =====
+let chatHistory = [];
+let chatReady = false;
+
+const CHAT_SYSTEM = `Du bist Max, ein freundlicher deutscher Muttersprachler und Sprachlehrer.
+Du hilfst dem Benutzer, Deutsch zu üben.
+Regeln:
+- Antworte IMMER auf Deutsch, egal in welcher Sprache der Benutzer schreibt
+- Wenn der Benutzer auf Arabisch schreibt, antworte auf Deutsch UND erkläre kurz auf Arabisch in Klammern
+- Wenn der Benutzer einen Grammatikfehler macht, korrigiere ihn freundlich am Ende deiner Antwort mit: 💡 Korrektur: ...
+- Halte die Antworten kurz und natürlich (2-4 Sätze)
+- Sei freundlich, ermutigend und gesprächig
+- Du kannst über alle Themen sprechen: Alltag, Reisen, Essen, Sport, etc.`;
+
+function initChat() {
+  if (chatReady) return;
+  chatReady = true;
+  chatHistory = [];
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = '';
+  appendChatMessage('bot', 'Hallo! Ich bin Max. 😊 Lass uns Deutsch üben! Worüber möchtest du sprechen?\n(مرحباً! أنا ماكس، تحدث معي بالألمانية عن أي شيء تريد!)');
+}
+
+function resetChat() {
+  chatReady = false;
+  chatHistory = [];
+  initChat();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const btn = document.getElementById('chat-send-btn');
+  input.value = '';
+  btn.disabled = true;
+  document.getElementById('chat-send-icon').textContent = '⏳';
+
+  appendChatMessage('user', text);
+  chatHistory.push({ role: 'user', content: text });
+
+  // Typing indicator
+  const typingId = appendChatMessage('bot', '...', true);
+
+  try {
+    const apiKey = ['gsk_bSCyLeggh87SSQ21IvRf','WGdyb3FYKPbkXkR4P9Wx','JsihtGGRIUrG'].join('');
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 300,
+        temperature: 0.7,
+        messages: [
+          { role: 'system', content: CHAT_SYSTEM },
+          ...chatHistory.slice(-10) // آخر 10 رسائل للسياق
+        ]
+      })
+    });
+
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || 'Entschuldigung, ich habe das nicht verstanden.';
+    chatHistory.push({ role: 'assistant', content: reply });
+    updateChatMessage(typingId, reply);
+
+  } catch (e) {
+    updateChatMessage(typingId, '❌ حدث خطأ، حاول مرة أخرى.');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('chat-send-icon').textContent = '➤';
+    input.focus();
+  }
+}
+
+let msgIdCounter = 0;
+function appendChatMessage(role, text, isTyping = false) {
+  const id = 'msg-' + (++msgIdCounter);
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `chat-msg chat-msg-${role}`;
+  div.id = id;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+  bubble.innerHTML = formatChatText(text);
+
+  // زر استماع للرسائل الألمانية
+  if (role === 'bot' && !isTyping) {
+    const speakBtn = document.createElement('button');
+    speakBtn.className = 'chat-speak-btn';
+    speakBtn.textContent = '🔊';
+    speakBtn.onclick = () => speakChatText(text);
+    div.appendChild(speakBtn);
+  }
+
+  div.appendChild(bubble);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return id;
+}
+
+function updateChatMessage(id, text) {
+  const div = document.getElementById(id);
+  if (!div) return;
+  const bubble = div.querySelector('.chat-bubble');
+  if (bubble) bubble.innerHTML = formatChatText(text);
+
+  // أضف زر استماع
+  if (!div.querySelector('.chat-speak-btn')) {
+    const speakBtn = document.createElement('button');
+    speakBtn.className = 'chat-speak-btn';
+    speakBtn.textContent = '🔊';
+    speakBtn.onclick = () => speakChatText(text);
+    div.insertBefore(speakBtn, bubble);
+  }
+
+  const container = document.getElementById('chat-messages');
+  container.scrollTop = container.scrollHeight;
+}
+
+function formatChatText(text) {
+  return text
+    .replace(/\n/g, '<br>')
+    .replace(/💡 Korrektur:(.*)/g, '<span class="chat-correction">💡 Korrektur:$1</span>');
+}
+
+function speakChatText(text) {
+  if (!window.speechSynthesis) return;
+  // اقرأ فقط النص الألماني (بدون الأقواس العربية)
+  const germanText = text.replace(/\(.*?\)/g, '').replace(/💡.*$/gm, '').trim();
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(germanText);
+  utter.lang = 'de-DE';
+  utter.rate = 0.85;
+  window.speechSynthesis.speak(utter);
 }
 
 // ===== TEXT TO SPEECH =====

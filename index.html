@@ -392,11 +392,34 @@
       </div>
     </div>
 
+    <!-- Chat Screen -->
+    <div class="screen" id="screen-chat">
+      <div class="navbar">
+        <div class="navbar-title">💬 محادثة بالألمانية</div>
+        <button class="navbar-btn" onclick="resetChat()" title="محادثة جديدة">🔄</button>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <!-- messages injected here -->
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" id="chat-input" type="text"
+          placeholder="اكتب بالألماني أو العربي..."
+          onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendChat(); }">
+        <button class="chat-send-btn" onclick="sendChat()" id="chat-send-btn">
+          <span id="chat-send-icon">➤</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Tab Bar -->
     <div class="tab-bar">
       <div class="tab-item" data-tab="home" onclick="switchTab('home')">
         <span class="tab-icon">🏠</span>
         <span class="tab-label">الرئيسية</span>
+      </div>
+      <div class="tab-item" data-tab="chat" onclick="switchTab('chat')">
+        <span class="tab-icon">💬</span>
+        <span class="tab-label">محادثة</span>
       </div>
       <div class="tab-item" data-tab="quiz" onclick="switchTab('quiz')">
         <span class="tab-icon">🧠</span>
