@@ -265,6 +265,12 @@ function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + name).classList.add('active');
   state.currentScreen = name;
+  // أخفِ الشريط السفلي في شاشات البطاقات والاختبار فقط
+  const tabBar = document.getElementById('global-tab-bar');
+  if (tabBar) {
+    const hideIn = ['flashcard', 'quiz', 'auth'];
+    tabBar.style.display = hideIn.includes(name) ? 'none' : 'flex';
+  }
 }
 
 function switchTab(tab) {

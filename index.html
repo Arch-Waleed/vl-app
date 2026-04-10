@@ -124,26 +124,6 @@
       <div class="section-title">التصنيفات</div>
       <div id="categories-list"></div>
     </div>
-
-    <!-- Tab Bar -->
-    <div class="tab-bar">
-      <div class="tab-item active" data-tab="home" onclick="switchTab('home')">
-        <span class="tab-icon">🏠</span>
-        <span class="tab-label">الرئيسية</span>
-      </div>
-      <div class="tab-item" data-tab="quiz" onclick="switchTab('quiz')">
-        <span class="tab-icon">🧠</span>
-        <span class="tab-label">اختبار</span>
-      </div>
-      <div class="tab-item" data-tab="favorites" onclick="switchTab('favorites')">
-        <span class="tab-icon">❤️</span>
-        <span class="tab-label">المفضلة</span>
-      </div>
-      <div class="tab-item" data-tab="add" onclick="switchTab('add')">
-        <span class="tab-icon">➕</span>
-        <span class="tab-label">إضافة</span>
-      </div>
-    </div>
   </div>
 
   <!-- ===== FLASHCARD SCREEN ===== -->
@@ -423,8 +403,8 @@
     </div>
   </div>
 
-  <!-- Tab Bar -->
-  <div class="tab-bar">
+  <!-- Global Tab Bar - يظهر دائماً في الأسفل -->
+  <div class="tab-bar" id="global-tab-bar">
     <div class="tab-item active" data-tab="home" onclick="switchTab('home')">
       <span class="tab-icon">🏠</span>
       <span class="tab-label">الرئيسية</span>
