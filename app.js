@@ -989,23 +989,26 @@ function setVoiceStatus(text, whoSpeaking) {
 function startListening() {
   if (!voiceMode || isSpeaking || useWhisper) return;
   stopListening();
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+
   recognition = new SR();
-  recognition.lang           = 'de-DE';
-  recognition.continuous     = true;
-  recognition.interimResults = true;
+  recognition.lang            = 'de-DE';
+  recognition.continuous      = false; // نعيد تشغيله يدوياً — أكثر استقراراً
+  recognition.interimResults  = true;
   recognition.maxAlternatives = 1;
+
   let collected = '';
-  let lastResultTime = Date.now();
 
   recognition.onstart = () => {
     collected = '';
-    setVoiceStatus('🎤 تحدث الآن...', 'user');
+    if (!isSpeaking) setVoiceStatus('🎤 تحدث الآن...', 'user');
   };
 
   recognition.onresult = (event) => {
-    lastResultTime = Date.now();
-    let interim = ''; collected = '';
+    collected = '';
+    let interim = '';
     for (let i = 0; i < event.results.length; i++) {
       if (event.results[i].isFinal) collected += event.results[i][0].transcript + ' ';
       else interim += event.results[i][0].transcript;
@@ -1013,31 +1016,32 @@ function startListening() {
     const display = (collected || interim).trim();
     if (display) setVoiceStatus('💬 ' + display, 'user');
     clearTimeout(silenceTimer);
-    // انتظر 2 ثانية صمت بعد آخر كلام
     if (collected.trim()) {
       silenceTimer = setTimeout(() => {
         const text = collected.trim();
-        if (text && voiceMode && !isSpeaking) { stopListening(); sendChatVoice(text); }
-      }, 2000);
+        if (text && voiceMode && !isSpeaking) {
+          stopListening();
+          sendChatVoice(text);
+        }
+      }, 1800);
     }
   };
 
   recognition.onerror = (e) => {
     if (e.error === 'aborted') return;
-    if (e.error === 'no-speech') {
-      // أعد المحاولة تلقائياً
-      if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 300);
-      return;
-    }
-    setTimeout(() => voiceMode && !isSpeaking && startListening(), 1000);
+    // أعد المحاولة في جميع الأخطاء
+    if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 400);
   };
 
   recognition.onend = () => {
-    if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 300);
+    // أهم شيء — إعادة البدء تلقائياً دائماً
+    if (voiceMode && !isSpeaking) setTimeout(() => startListening(), 200);
   };
 
-  try { recognition.start(); } catch(e) {
-    setTimeout(() => voiceMode && !isSpeaking && startListening(), 500);
+  try {
+    recognition.start();
+  } catch(e) {
+    setTimeout(() => voiceMode && !isSpeaking && startListening(), 400);
   }
 }
 
