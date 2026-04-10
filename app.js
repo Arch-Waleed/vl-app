@@ -203,52 +203,60 @@ let state = {
   activeTab: 'home'
 };
 
-// ===== STATE: Firebase Realtime Database (مزامنة بين الأجهزة) =====
+// ===== STATE: localStorage أولاً + Firebase للمزامنة =====
+function saveState() {
+  if (!currentUID || currentUID === 'guest') return;
+  const data = {
+    learned:     [...state.learned],
+    favorites:   [...state.favorites],
+    customWords: customWords
+  };
+  // ١. احفظ فوراً في localStorage (يعمل دائماً بدون إنترنت)
+  localStorage.setItem(`vl_${currentUID}`, JSON.stringify(data));
+  // ٢. زامن مع Firebase (للمزامنة بين الأجهزة)
+  db.ref(`users/${currentUID}`).set(data).catch(() => {});
+}
+
 function loadState() {
   if (!currentUID || currentUID === 'guest') return;
 
-  // إيقاف أي مستمع سابق
-  if (dbListener) {
-    db.ref(`users/${currentUID}`).off('value', dbListener);
+  // أولاً: حمّل من localStorage فوراً حتى لا يظهر فراغ
+  const local = localStorage.getItem(`vl_${currentUID}`);
+  if (local) {
+    try {
+      const d = JSON.parse(local);
+      state.learned   = new Set(d.learned   || []);
+      state.favorites = new Set(d.favorites || []);
+      customWords     = d.customWords       || [];
+    } catch(e) {}
+  } else {
+    state.learned   = new Set();
+    state.favorites = new Set();
+    customWords     = [];
   }
 
-  // مستمع فوري — يُحدّث التطبيق تلقائياً عند أي تغيير من أي جهاز
+  // ثانياً: اجلب من Firebase (قد يكون أحدث من جهاز آخر)
+  if (dbListener) {
+    db.ref(`users/${currentUID}`).off('value', dbListener);
+    dbListener = null;
+  }
   dbListener = db.ref(`users/${currentUID}`).on('value', snapshot => {
     const data = snapshot.val();
     if (data) {
       state.learned   = new Set(data.learned   || []);
       state.favorites = new Set(data.favorites || []);
       customWords     = data.customWords       || [];
-    } else {
-      // مستخدم جديد — جرب نقل بيانات localStorage القديمة
-      const old = localStorage.getItem(`vl_${currentUID}`);
-      if (old) {
-        try {
-          const d = JSON.parse(old);
-          state.learned   = new Set(d.learned   || []);
-          state.favorites = new Set(d.favorites || []);
-          customWords     = d.customWords       || [];
-          saveState(); // ارفعها لـ Firebase
-        } catch(e) {}
-      } else {
-        state.learned   = new Set();
-        state.favorites = new Set();
-        customWords     = [];
-      }
+      // حدّث localStorage بالبيانات الأحدث من Firebase
+      localStorage.setItem(`vl_${currentUID}`, JSON.stringify(data));
+    } else if (!local) {
+      // مستخدم جديد بدون بيانات
+      state.learned   = new Set();
+      state.favorites = new Set();
+      customWords     = [];
     }
-    // تحديث الشاشة الحالية
-    if (state.activeTab === 'home') renderHome();
-    else if (state.activeTab === 'add') renderCustomWordsList();
-    else if (state.activeTab === 'favorites') renderFavorites();
-  });
-}
-
-function saveState() {
-  if (!currentUID || currentUID === 'guest') return;
-  db.ref(`users/${currentUID}`).set({
-    learned:     [...state.learned],
-    favorites:   [...state.favorites],
-    customWords: customWords
+    renderHome();
+    if (state.activeTab === 'add')       renderCustomWordsList();
+    if (state.activeTab === 'favorites') renderFavorites();
   });
 }
 
