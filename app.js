@@ -867,104 +867,107 @@ function speakChatText(text) {
 }
 
 // ===== VOICE INPUT =====
-let recognition = null;
-let isListening = false;
-let voiceMode = false;   // وضع المحادثة الصوتية المستمرة
+let recognition  = null;
+let voiceMode    = false;
+let isSpeaking   = false;   // ماكس يتحدث الآن
+let silenceTimer = null;
 
 function enterVoiceMode() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    showToast('❌ يعمل فقط في Chrome أو Edge');
-    return;
-  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showToast('❌ يعمل فقط في Chrome أو Edge'); return; }
   voiceMode = true;
-  document.getElementById('chat-input-bar').style.display = 'none';
+  document.getElementById('chat-input-bar').style.display  = 'none';
   document.getElementById('chat-voice-mode').style.display = 'flex';
-  startVoice();
+  startListening();
 }
 
 function exitVoiceMode() {
-  voiceMode = false;
-  stopVoice();
+  voiceMode  = false;
+  isSpeaking = false;
+  stopListening();
   window.speechSynthesis.cancel();
   document.getElementById('chat-voice-mode').style.display = 'none';
-  document.getElementById('chat-input-bar').style.display = 'flex';
+  document.getElementById('chat-input-bar').style.display  = 'flex';
 }
 
+function toggleVoice() { /* الكرة لا تفعل شيئاً — المحادثة تلقائية */ }
+
 function setVoiceStatus(text, listening) {
-  const orb = document.getElementById('voice-orb');
+  const orb    = document.getElementById('voice-orb');
   const status = document.getElementById('voice-status');
-  const icon = document.getElementById('voice-orb-icon');
+  const icon   = document.getElementById('voice-orb-icon');
   if (!orb) return;
   if (listening) {
     orb.classList.add('orb-listening');
-    icon.textContent = '🔴';
-    status.textContent = text || 'جاري الاستماع...';
+    icon.textContent   = '🔴';
   } else {
     orb.classList.remove('orb-listening');
-    icon.textContent = '🎤';
-    status.textContent = text || 'اضغط للتحدث';
+    icon.textContent   = isSpeaking ? '🔊' : '🎤';
   }
+  if (status) status.textContent = text;
 }
 
-function toggleVoice() {
-  if (isListening) stopVoice();
-  else startVoice();
-}
+function startListening() {
+  if (!voiceMode || isSpeaking) return;
+  stopListening();
 
-function startVoice() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
 
-  recognition = new SpeechRecognition();
-  recognition.lang = 'de-DE';
-  recognition.continuous = false;
-  recognition.interimResults = true;
+  recognition = new SR();
+  recognition.lang            = 'de-DE';
+  recognition.continuous      = true;   // لا يتوقف أثناء الكلام
+  recognition.interimResults  = true;
+
+  let collected = '';
 
   recognition.onstart = () => {
-    isListening = true;
-    if (voiceMode) setVoiceStatus('🎤 جاري الاستماع...', true);
+    collected = '';
+    setVoiceStatus('🎤 تحدث الآن...', true);
   };
 
   recognition.onresult = (event) => {
-    let transcript = '';
+    let interim = '';
+    collected   = '';
     for (let i = 0; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
+      if (event.results[i].isFinal) collected += event.results[i][0].transcript + ' ';
+      else interim += event.results[i][0].transcript;
     }
-    if (voiceMode) {
-      document.getElementById('voice-status').textContent = '💬 ' + transcript;
-    } else {
-      document.getElementById('chat-input').value = transcript;
-    }
-    if (event.results[event.results.length - 1].isFinal && transcript.trim()) {
-      stopVoice();
-      if (voiceMode) {
-        sendChatVoice(transcript.trim());
-      } else {
-        setTimeout(() => sendChat(), 300);
-      }
+    const display = (collected || interim).trim();
+    if (display) setVoiceStatus('💬 ' + display, true);
+
+    // بعد توقف 1.5 ثانية عن الكلام → أرسل
+    clearTimeout(silenceTimer);
+    if (collected.trim()) {
+      silenceTimer = setTimeout(() => {
+        const text = collected.trim();
+        if (text && voiceMode && !isSpeaking) {
+          stopListening();
+          sendChatVoice(text);
+        }
+      }, 1500);
     }
   };
 
   recognition.onerror = (e) => {
-    stopVoice();
-    if (voiceMode && e.error !== 'no-speech') {
-      setVoiceStatus('❌ لم أسمعك، حاول مجدداً', false);
-      setTimeout(() => voiceMode && startVoice(), 2000);
-    }
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    // أعد المحاولة تلقائياً
+    setTimeout(() => voiceMode && !isSpeaking && startListening(), 1000);
   };
 
   recognition.onend = () => {
-    isListening = false;
-    if (voiceMode) setVoiceStatus('اضغط للتحدث', false);
+    // أعد الاستماع تلقائياً إن لم يكن ماكس يتحدث
+    if (voiceMode && !isSpeaking) {
+      setTimeout(() => startListening(), 600);
+    }
   };
 
   try { recognition.start(); } catch(e) {}
 }
 
-function stopVoice() {
-  isListening = false;
-  if (recognition) { try { recognition.stop(); } catch(e) {} }
+function stopListening() {
+  clearTimeout(silenceTimer);
+  if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
 }
 
 // إرسال عبر الصوت في الوضع المستمر
@@ -995,24 +998,30 @@ async function sendChatVoice(text) {
     updateChatMessage(typingId, reply);
 
     // اقرأ الرد بصوت ألماني ثم استمع تلقائياً
+    isSpeaking = true;
     setVoiceStatus('🔊 ماكس يتحدث...', false);
     const germanText = reply.replace(/\(.*?\)/g, '').replace(/💡.*$/gm, '').trim();
     const utter = new SpeechSynthesisUtterance(germanText);
     utter.lang = 'de-DE';
     utter.rate = 0.85;
     utter.onend = () => {
+      isSpeaking = false;
       if (voiceMode) {
-        setVoiceStatus('اضغط للتحدث', false);
-        // ابدأ الاستماع تلقائياً بعد ثانية
-        setTimeout(() => voiceMode && startVoice(), 800);
+        setVoiceStatus('🎤 تحدث الآن...', false);
+        setTimeout(() => startListening(), 700);
       }
+    };
+    utter.onerror = () => {
+      isSpeaking = false;
+      if (voiceMode) setTimeout(() => startListening(), 700);
     };
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utter);
 
   } catch(e) {
+    isSpeaking = false;
     updateChatMessage(typingId, '❌ حدث خطأ');
-    if (voiceMode) setTimeout(() => voiceMode && startVoice(), 2000);
+    if (voiceMode) setTimeout(() => startListening(), 2000);
   }
 }
 
