@@ -16,6 +16,9 @@ let currentUser = null;
 let currentUID = 'guest';
 let dbListener = null;
 
+// ثبّت الجلسة دائماً حتى بعد إغلاق التطبيق
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+
 // ===== AUTH FUNCTIONS =====
 function showLogin() {
   document.getElementById('login-form').style.display = 'block';
