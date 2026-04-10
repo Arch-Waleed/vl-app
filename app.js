@@ -262,6 +262,22 @@ function loadState() {
 
 // ===== NAVIGATION =====
 function showScreen(name) {
+  // إذا خرجنا من المحادثة — أوقف كل شيء
+  if (state.currentScreen === 'chat' && name !== 'chat') {
+    window.speechSynthesis.cancel();
+    stopListening();
+    stopWhisperRecording(true);
+    stopWave();
+    if (voiceMode) {
+      voiceMode  = false;
+      isSpeaking = false;
+      const vm = document.getElementById('chat-voice-mode');
+      const cb = document.getElementById('chat-input-bar');
+      if (vm) vm.style.display = 'none';
+      if (cb) cb.style.display = 'none';
+    }
+  }
+
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + name).classList.add('active');
   state.currentScreen = name;
@@ -276,11 +292,17 @@ function showScreen(name) {
   // أظهر شريط المحادثة فقط في صفحة المحادثة
   const chatBar = document.getElementById('chat-input-bar');
   if (chatBar) {
-    chatBar.style.display = (name === 'chat' && chatStarted) ? 'flex' : 'none';
+    chatBar.style.display = (name === 'chat' && chatStarted && !voiceMode) ? 'flex' : 'none';
   }
 }
 
 function switchTab(tab) {
+  // أوقف الصوت إذا خرجنا من المحادثة
+  if (state.activeTab === 'chat' && tab !== 'chat') {
+    window.speechSynthesis.cancel();
+    stopListening();
+    stopWave();
+  }
   state.activeTab = tab;
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
   document.querySelectorAll(`.tab-item[data-tab="${tab}"]`).forEach(t => t.classList.add('active'));
@@ -882,12 +904,16 @@ function enterVoiceMode() {
 function exitVoiceMode() {
   voiceMode  = false;
   isSpeaking = false;
+  isRecording = false;
+  clearTimeout(silenceTimer);
   stopListening();
   stopWhisperRecording(true);
   window.speechSynthesis.cancel();
-  document.getElementById('chat-voice-mode').style.display = 'none';
-  document.getElementById('chat-input-bar').style.display  = 'flex';
-  document.getElementById('voice-orb').onclick = null;
+  stopWave();
+  const vm = document.getElementById('chat-voice-mode');
+  const cb = document.getElementById('chat-input-bar');
+  if (vm) vm.style.display = 'none';
+  if (cb) cb.style.display = 'flex';
 }
 
 // ===== WAVE CANVAS =====
