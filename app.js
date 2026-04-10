@@ -5,13 +5,16 @@ const firebaseConfig = {
   projectId: "vl-app-135e4",
   storageBucket: "vl-app-135e4.firebasestorage.app",
   messagingSenderId: "689759592792",
-  appId: "1:689759592792:web:c3289c27a6db63c627452d"
+  appId: "1:689759592792:web:c3289c27a6db63c627452d",
+  databaseURL: "https://vl-app-135e4-default-rtdb.firebaseio.com"
 };
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+const db   = firebase.database();
 let currentUser = null;
 let currentUID = 'guest';
+let dbListener = null;
 
 // ===== AUTH FUNCTIONS =====
 function showLogin() {
@@ -197,33 +200,53 @@ let state = {
   activeTab: 'home'
 };
 
-// Load from localStorage (per user)
+// ===== STATE: Firebase Realtime Database (مزامنة بين الأجهزة) =====
 function loadState() {
-  try {
-    const key = `vl_${currentUID}`;
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      const data = JSON.parse(saved);
-      state.learned   = new Set(data.learned || []);
+  if (!currentUID || currentUID === 'guest') return;
+
+  // إيقاف أي مستمع سابق
+  if (dbListener) {
+    db.ref(`users/${currentUID}`).off('value', dbListener);
+  }
+
+  // مستمع فوري — يُحدّث التطبيق تلقائياً عند أي تغيير من أي جهاز
+  dbListener = db.ref(`users/${currentUID}`).on('value', snapshot => {
+    const data = snapshot.val();
+    if (data) {
+      state.learned   = new Set(data.learned   || []);
       state.favorites = new Set(data.favorites || []);
-      customWords     = data.customWords || [];
+      customWords     = data.customWords       || [];
     } else {
-      state.learned   = new Set();
-      state.favorites = new Set();
-      customWords     = [];
+      // مستخدم جديد — جرب نقل بيانات localStorage القديمة
+      const old = localStorage.getItem(`vl_${currentUID}`);
+      if (old) {
+        try {
+          const d = JSON.parse(old);
+          state.learned   = new Set(d.learned   || []);
+          state.favorites = new Set(d.favorites || []);
+          customWords     = d.customWords       || [];
+          saveState(); // ارفعها لـ Firebase
+        } catch(e) {}
+      } else {
+        state.learned   = new Set();
+        state.favorites = new Set();
+        customWords     = [];
+      }
     }
-  } catch(e) {}
+    // تحديث الشاشة الحالية
+    if (state.activeTab === 'home') renderHome();
+    else if (state.activeTab === 'add') renderCustomWordsList();
+    else if (state.activeTab === 'favorites') renderFavorites();
+  });
 }
 
 function saveState() {
-  try {
-    const key = `vl_${currentUID}`;
-    localStorage.setItem(key, JSON.stringify({
-      learned:     [...state.learned],
-      favorites:   [...state.favorites],
-      customWords: customWords
-    }));
-  } catch(e) {}
+  if (!currentUID || currentUID === 'guest') return;
+  db.ref(`users/${currentUID}`).set({
+    learned:     [...state.learned],
+    favorites:   [...state.favorites],
+    customWords: customWords
+  });
 }
 
 // ===== NAVIGATION =====
