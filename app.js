@@ -508,7 +508,7 @@ function showQuizResult() {
   });
 }
 
-// ===== AUTO TRANSLATION (Claude AI) =====
+// ===== AUTO TRANSLATION (Groq AI - مجاني) =====
 async function autoTranslate() {
   const german = document.getElementById('input-german').value.trim();
   if (!german) {
@@ -516,7 +516,7 @@ async function autoTranslate() {
     return;
   }
 
-  const apiKey = localStorage.getItem('claudeApiKey');
+  const apiKey = localStorage.getItem('groqApiKey');
   if (!apiKey) {
     showApiKeyModal();
     return;
@@ -533,23 +533,22 @@ async function autoTranslate() {
   try {
     const prompt = `You are a German language teacher. For the German word/phrase "${german}", provide:
 1. The accurate Arabic translation
-2. One natural German example sentence in present tense that actually demonstrates the meaning of this word
-3. One natural German example sentence in past tense that actually demonstrates the meaning of this word
+2. One natural German example sentence in present tense that actually uses this word in context
+3. One natural German example sentence in past tense that actually uses this word in context
 
-Respond ONLY with valid JSON in this exact format, nothing else:
+Respond ONLY with valid JSON in this exact format, no extra text:
 {"arabic":"...", "present":"...", "past":"..."}`;
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-allow-browser': 'true'
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5',
+        model: 'llama-3.1-8b-instant',
         max_tokens: 256,
+        temperature: 0.3,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -562,7 +561,7 @@ Respond ONLY with valid JSON in this exact format, nothing else:
     }
 
     const data = await res.json();
-    const text = data.content?.[0]?.text || '';
+    const text = data.choices?.[0]?.message?.content || '';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('لم يتم الحصول على نتيجة صحيحة');
     const result = JSON.parse(jsonMatch[0]);
@@ -600,7 +599,7 @@ function showAiError(msg) {
 function showApiKeyModal() {
   const modal = document.getElementById('apikey-modal');
   modal.style.display = 'flex';
-  const saved = localStorage.getItem('claudeApiKey');
+  const saved = localStorage.getItem('groqApiKey');
   if (saved) document.getElementById('apikey-input').value = saved;
 }
 
@@ -614,7 +613,7 @@ function saveApiKey() {
     alert('الرجاء إدخال المفتاح');
     return;
   }
-  localStorage.setItem('claudeApiKey', key);
+  localStorage.setItem('groqApiKey', key);
   closeApiKeyModal();
   showToast('✅ تم حفظ المفتاح!');
   const german = document.getElementById('input-german').value.trim();
